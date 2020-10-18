@@ -7,6 +7,7 @@ import pigpio
 import queue
 import sys
 import threading
+import time
 
 consolelogformatter = logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
 logger = logging.getLogger('stdout')
@@ -27,6 +28,9 @@ def parse_args():
     ]
     parser.add_argument('--action', nargs='?', required=True,
                         choices=actions, help="Execute an action")
+    parser.add_argument('--type', nargs='?', required=True,
+                        choices=["callback", "wait"],
+                        help="Pigpio slave type")
     parser.add_argument('--loglevel', nargs='?',
                         choices=["debug", "info", "warning", "error", "critical"],
                         help="Loglevel")
@@ -43,7 +47,27 @@ class I2CSlave():
             logger.error("not pi.connected")
             return
 
-    def run(self, q):
+    def set_callback(self, q):
+        logger.debug("set_callback()")
+        e = self.pi.event_callback(pigpio.EVENT_BSC, self.callback)
+        self.pi.bsc_i2c(self.address)
+        time.sleep(2)
+        e.cancel()
+        self.pi.bsc_i2c(0) # Disable BSC peripheral
+        self.pi.stop()
+
+    def callback(self, id, tick):
+        logger.debug(f"callback({id}, {tick})")
+        s, b, d = self.pi.bsc_i2c(self.address)
+        result = None
+        if b:
+            logger.debug(f"Received {b} bytes! Status {s}")
+            result = [hex(c) for c in d]
+            logger.info(f"Response: {result}")
+        else:
+            logger.error(f"Received number of bytes was {b}")
+
+    def wait(self, q):
         try:
             self.pi.bsc_i2c(self.address)
             if self.pi.wait_for_event(pigpio.EVENT_BSC, 5):
@@ -94,7 +118,10 @@ if __name__ == "__main__":
     q = queue.Queue()
 
     slave = I2CSlave(address=0x40)
-    slave_thread = threading.Thread(target=slave.run, args=[q])
+    if args.type == 'callback':
+        slave_thread = threading.Thread(target=slave.set_callback, args=[q])
+    elif args.type == 'wait':
+        slave_thread = threading.Thread(target=slave.wait, args=[q])
     slave_thread.start()
 
     master = I2CMaster(address=0x41, bus=1)
@@ -102,5 +129,6 @@ if __name__ == "__main__":
         master.execute_action(args.action)
     master.close()
 
-    result = q.get()
-    logger.info(f"Response: {result}")
+    if args.type == 'wait':
+        result = q.get()
+        logger.info(f"Response: {result}")
