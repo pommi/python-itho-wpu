@@ -34,6 +34,10 @@ def parse_args():
     parser.add_argument('--loglevel', nargs='?',
                         choices=["debug", "info", "warning", "error", "critical"],
                         help="Loglevel")
+    parser.add_argument('--master-only', action='store_true', help="Only run I2C master")
+    parser.add_argument('--slave-only', action='store_true', help="Only run I2C slave")
+    parser.add_argument('--slave-timeout', nargs='?', type=int, default=2,
+                        help="Slave timeout in seconds.")
 
     args = parser.parse_args()
     return args
@@ -47,11 +51,12 @@ class I2CSlave():
             logger.error("not pi.connected")
             return
 
-    def set_callback(self, q):
+    def set_callback(self, q, timeout):
         logger.debug("set_callback()")
         e = self.pi.event_callback(pigpio.EVENT_BSC, self.callback)
         self.pi.bsc_i2c(self.address)
-        time.sleep(2)
+        logger.debug(f"Waiting {timeout}s for activity")
+        time.sleep(timeout)
         e.cancel()
         self.pi.bsc_i2c(0) # Disable BSC peripheral
         self.pi.stop()
@@ -117,18 +122,20 @@ if __name__ == "__main__":
 
     q = queue.Queue()
 
-    slave = I2CSlave(address=0x40)
-    if args.type == 'callback':
-        slave_thread = threading.Thread(target=slave.set_callback, args=[q])
-    elif args.type == 'wait':
-        slave_thread = threading.Thread(target=slave.wait, args=[q])
-    slave_thread.start()
+    if not args.master_only:
+        slave = I2CSlave(address=0x40)
+        if args.type == 'callback':
+            slave_thread = threading.Thread(target=slave.set_callback, args=[q, args.slave_timeout])
+        elif args.type == 'wait':
+            slave_thread = threading.Thread(target=slave.wait, args=[q])
+        slave_thread.start()
 
-    master = I2CMaster(address=0x41, bus=1)
-    if args.action:
-        master.execute_action(args.action)
-    master.close()
+    if not args.slave_only:
+        master = I2CMaster(address=0x41, bus=1)
+        if args.action:
+            master.execute_action(args.action)
+        master.close()
 
-    if args.type == 'wait':
+    if args.type == 'wait' and not args.master_only:
         result = q.get()
         logger.info(f"Response: {result}")
