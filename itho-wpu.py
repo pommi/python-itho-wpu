@@ -68,7 +68,8 @@ class I2CSlave():
         if b:
             logger.debug(f"Received {b} bytes! Status {s}")
             result = [hex(c) for c in d]
-            logger.info(f"Response: {result}")
+            if self.is_checksum_valid(result):
+                logger.info(f"Response: {result}")
         else:
             logger.error(f"Received number of bytes was {b}")
 
@@ -81,7 +82,8 @@ class I2CSlave():
                 if b:
                     logger.debug(f"Received {b} bytes! Status {s}")
                     result = [hex(c) for c in d]
-                    q.put(result)
+                    if self.is_checksum_valid(result):
+                        q.put(result)
                 else:
                     logger.error(f"Received number of bytes was {b}")
             else:
@@ -90,6 +92,18 @@ class I2CSlave():
             self.close()
         else:
             self.close()
+
+    def is_checksum_valid(self, b):
+        s = 0x80
+        for i in b[:-1]:
+            s += int(i, 0)
+        checksum = 256 - (s % 256)
+        if checksum == 256:
+            checksum = 0
+        if checksum != int(b[-1], 0):
+            logger.debug(f"Checksum invalid (0x{checksum:02x})")
+            return False
+        return True
 
     def close(self):
         self.pi.bsc_i2c(0)
