@@ -6,7 +6,6 @@ import logging
 import pigpio
 import queue
 import sys
-import threading
 import time
 
 consolelogformatter = logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
@@ -33,30 +32,26 @@ def parse_args():
                         help="Loglevel")
     parser.add_argument('--master-only', action='store_true', help="Only run I2C master")
     parser.add_argument('--slave-only', action='store_true', help="Only run I2C slave")
-    parser.add_argument('--slave-timeout', nargs='?', type=int, default=2,
-                        help="Slave timeout in seconds.")
+    parser.add_argument('--slave-timeout', nargs='?', type=int, default=60,
+                        help="Slave timeout in seconds when --slave-only")
 
     args = parser.parse_args()
     return args
 
 
 class I2CSlave():
-    def __init__(self, address):
+    def __init__(self, address, queue):
         self.address = address
+        self.queue = queue
         self.pi = pigpio.pi()
         if not self.pi.connected:
             logger.error("not pi.connected")
             return
 
-    def set_callback(self, q, timeout):
+    def set_callback(self):
         logger.debug("set_callback()")
-        e = self.pi.event_callback(pigpio.EVENT_BSC, self.callback)
+        self.event_callback = self.pi.event_callback(pigpio.EVENT_BSC, self.callback)
         self.pi.bsc_i2c(self.address)
-        logger.debug(f"Waiting {timeout}s for activity")
-        time.sleep(timeout)
-        e.cancel()
-        self.pi.bsc_i2c(0) # Disable BSC peripheral
-        self.pi.stop()
 
     def callback(self, id, tick):
         logger.debug(f"callback({id}, {tick})")
@@ -65,10 +60,11 @@ class I2CSlave():
         if b:
             logger.debug(f"Received {b} bytes! Status {s}")
             result = [hex(c) for c in d]
+            logger.debug(f"Callback Response: {result}")
             if self.is_checksum_valid(result):
-                logger.info(f"Response: {result}")
+                self.queue.put(result)
         else:
-            logger.error(f"Received number of bytes was {b}")
+            logger.debug(f"Received number of bytes was {b}")
 
     def is_checksum_valid(self, b):
         s = 0x80
@@ -78,18 +74,20 @@ class I2CSlave():
         if checksum == 256:
             checksum = 0
         if checksum != int(b[-1], 0):
-            logger.debug(f"Checksum invalid (0x{checksum:02x})")
+            logger.debug(f"Checksum invalid (0x{checksum:02x} != {b[-1]})")
             return False
         return True
 
     def close(self):
+        self.event_callback.cancel()
         self.pi.bsc_i2c(0)
         self.pi.stop()
 
 
 class I2CMaster:
-    def __init__(self, address, bus):
+    def __init__(self, address, bus, queue):
         self.i = i2c_raw.I2CRaw(address=address, bus=bus)
+        self.queue = queue
 
     def execute_action(self, action):
         actions = {
@@ -98,8 +96,19 @@ class I2CMaster:
             "getdatatype": [0x80, 0xA4, 0x00, 0x04, 0x00, 0x56],
             "getdatalog": [0x80, 0xA4, 0x01, 0x04, 0x00, 0x55],
         }
-        logger.info(f"Executing action: {action}")
-        self.i.write_i2c_block_data(actions[action])
+        result = None
+        for i in range(0, 20):
+            logger.debug(f"Executing action: {action}")
+            self.i.write_i2c_block_data(actions[action])
+            time.sleep(0.21)
+            logger.debug("Queue size: {}".format(self.queue.qsize()))
+            if self.queue.qsize() > 0:
+                result = self.queue.get()
+                break
+
+        if result is None:
+            logger.error(f"No valid result in 20 requests")
+        return result
 
     def close(self):
         self.i.close()
@@ -114,12 +123,17 @@ if __name__ == "__main__":
     q = queue.Queue()
 
     if not args.master_only:
-        slave = I2CSlave(address=0x40)
-        slave_thread = threading.Thread(target=slave.set_callback, args=[q, args.slave_timeout])
-        slave_thread.start()
+        slave = I2CSlave(address=0x40, queue=q)
+        slave.set_callback()
+        if args.slave_only:
+            time.sleep(args.slave_timeout)
 
     if not args.slave_only:
-        master = I2CMaster(address=0x41, bus=1)
+        master = I2CMaster(address=0x41, bus=1, queue=q)
         if args.action:
-            master.execute_action(args.action)
+            result = master.execute_action(args.action)
+            logger.info(f"Response: {result}")
         master.close()
+
+    if not args.master_only:
+        slave.close()
