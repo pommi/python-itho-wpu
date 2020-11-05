@@ -7,6 +7,7 @@ import pigpio
 import queue
 import sys
 import time
+from collections import namedtuple
 
 consolelogformatter = logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
 logger = logging.getLogger('stdout')
@@ -114,6 +115,64 @@ class I2CMaster:
         self.i.close()
 
 
+def process_response(action, response):
+    if action == "getdatalog" and int(response[1], 0) == 0xA4 and int(response[2], 0) == 0x01:
+        measurements = process_datalog(response)
+
+
+def process_datalog(response):
+    # 0 = Byte
+    # 1 = UnsignedInt
+    # 2 = SignedIntDec2
+    Field = namedtuple('Field', 'index type label description')
+    datalog = [
+        Field(0, 2, "t_out", "Buitentemperatuur"),
+        Field(2, 2, "t_boiltop", "Boiler laag"),
+        Field(4, 2, "t_boildwn", "Boiler hoog"),
+        Field(6, 2, "t_evap", "Verdamper temperatuur"),
+        Field(8, 2, "t_suct", "Zuiggas temperatuur"),
+        Field(10, 2, "t_disc", "Persgas temperatuur"),
+        Field(12, 2, "t_cond", "Vloeistof temperatuur"),
+        Field(14, 2, "t_source_r", "Naar bron"),
+        Field(16, 2, "t_source_s", "Van bron"),
+        Field(18, 2, "t_ch_supp", "CV aanvoer"),
+        Field(20, 2, "t_ch_ret", "CV retour"),
+        Field(22, 2, "p_sens", "Druksensor (Bar)"),
+        Field(24, 2, "i_tr1", "Stroom trafo 1 (A)"),
+        Field(26, 2, "i_tr2", "Stroom trafo 2 (A)"),
+        Field(34, 1, "in_flow", "Flow sensor bron (l/h)"),
+        Field(37, 0, "out_ch", "Snelheid cv pomp (%)"),
+        Field(38, 0, "out_src", "Snelheid bron pomp (%)"),
+        Field(39, 0, "out_dhw", "Snelheid boiler pomp (%)"),
+        Field(44, 0, "out_c1", "Compressor aan/uit"),
+        Field(45, 0, "out_ele", "Elektrisch element aan/uit"),
+        Field(46, 0, "out_trickle", "Trickle heating aan/uit"),
+        Field(47, 0, "out_fault", "Fout aanwezig (0=J, 1=N)"),
+        Field(48, 0, "out_fc", "Vrijkoelen actief (0=uit, 1=aan)"),
+        Field(51, 2, "ot_room", "Kamertemperatuur"),
+        Field(55, 0, "ot_mod", "Warmtevraag (%)"),
+        Field(56, 0, "state", "State (0=init,1=uit,2=CV,3=boiler,4=vrijkoel,5=ontluchten)"),
+        Field(57, 0, "sub_state", "Substatus (255=geen)"),
+        Field(67, 0, "fault_reported", "Fout gevonden (foutcode)"),
+        Field(92, 1, "tr_fc", "Vrijkoelen interval (sec)"),
+    ]
+    message = response[5:]
+    measurements = {}
+    for d in datalog:
+        if d.type == 0:
+            m = message[d.index:d.index+1]
+            num = int(m[0], 0)
+        elif d.type == 1:
+            m = message[d.index:d.index+2]
+            num = ((int(m[0], 0) << 8) + int(m[1], 0))
+        elif d.type == 2:
+            m = message[d.index:d.index+2]
+            num = round(((int(m[0], 0) << 8) + int(m[1], 0)) / 100.0, 2)
+        logger.info(f"{d.description}: {num}")
+        measurements[d.label] = num
+    return measurements
+
+
 if __name__ == "__main__":
     args = parse_args()
 
@@ -132,8 +191,11 @@ if __name__ == "__main__":
         master = I2CMaster(address=0x41, bus=1, queue=q)
         if args.action:
             result = master.execute_action(args.action)
-            logger.info(f"Response: {result}")
+            logger.debug(f"Response: {result}")
         master.close()
+
+        if result is not None:
+            process_response(args.action, result)
 
     if not args.master_only:
         slave.close()
