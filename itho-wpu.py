@@ -7,6 +7,8 @@ import pigpio
 import queue
 import sys
 import time
+import os
+import datetime
 from collections import namedtuple
 
 consolelogformatter = logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
@@ -15,6 +17,29 @@ logger.setLevel(logging.INFO)
 stdout_log_handler = logging.StreamHandler(sys.stdout)
 stdout_log_handler.setFormatter(consolelogformatter)
 logger.addHandler(stdout_log_handler)
+
+
+def export_to_influxdb(action, measurements):
+    from influxdb import InfluxDBClient
+
+    influx_client = InfluxDBClient(
+        host=os.getenv('INFLUXDB_HOST', 'localhost'),
+        port=os.getenv('INFLUXDB_PORT', 8086),
+        username=os.getenv('INFLUXDB_USERNAME', 'root'),
+        password=os.getenv('INFLUXDB_PASSWORD', 'root'),
+        database=os.getenv('INFLUXDB_DATABASE')
+    )
+    json_body = [
+        {
+            "measurement": action,
+            "time": datetime.datetime.utcnow().replace(microsecond=0).isoformat(),
+            "fields": measurements,
+        }
+    ]
+    try:
+        influx_client.write_points(json_body)
+    except Exception as e:
+        print('Failed to write to influxdb: ', e)
 
 
 def parse_args():
@@ -35,6 +60,8 @@ def parse_args():
     parser.add_argument('--slave-only', action='store_true', help="Only run I2C slave")
     parser.add_argument('--slave-timeout', nargs='?', type=int, default=60,
                         help="Slave timeout in seconds when --slave-only")
+    parser.add_argument('--export-to-influxdb', action='store_true',
+                        help="Export results to InfluxDB")
 
     args = parser.parse_args()
     return args
@@ -115,9 +142,12 @@ class I2CMaster:
         self.i.close()
 
 
-def process_response(action, response):
+def process_response(action, response, args):
     if action == "getdatalog" and int(response[1], 0) == 0xA4 and int(response[2], 0) == 0x01:
         measurements = process_datalog(response)
+
+    if args.export_to_influxdb:
+        export_to_influxdb(action, measurements)
 
 
 def process_datalog(response):
@@ -195,7 +225,7 @@ if __name__ == "__main__":
         master.close()
 
         if result is not None:
-            process_response(args.action, result)
+            process_response(args.action, result, args)
 
     if not args.master_only:
         slave.close()
