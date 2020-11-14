@@ -46,7 +46,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Itho WPU i2c master')
 
     actions = [
-        "getregelaar",
+        "getnodeid",
         "getserial",
         "getdatatype",
         "getdatalog",
@@ -127,7 +127,7 @@ class I2CMaster:
 
     def execute_action(self, action):
         actions = {
-            "getregelaar": [0x80, 0x90, 0xE0, 0x04, 0x00, 0x8A],
+            "getnodeid": [0x80, 0x90, 0xE0, 0x04, 0x00, 0x8A],
             "getserial": [0x80, 0x90, 0xE1, 0x04, 0x00, 0x89],
             "getdatatype": [0x80, 0xA4, 0x00, 0x04, 0x00, 0x56],
             "getdatalog": [0x80, 0xA4, 0x01, 0x04, 0x00, 0x55],
@@ -159,6 +159,28 @@ def process_response(action, response, args):
         measurements = process_datalog(response)
         if args.export_to_influxdb:
             export_to_influxdb(action, measurements)
+    elif action == "getnodeid":
+        process_nodeid(response)
+
+
+def process_nodeid(response):
+    if int(response[1], 0) != 0x90 and int(response[2], 0) != 0xE0:
+        logger.error(f"Response MessageClass != 0x90 0xE0 (getnodeid), but {response[1]} {response[2]}")
+        return
+
+    manufacturergroup = ((int(response[5], 0) << 8) + int(response[6], 0))
+    manufacturer = int(response[7], 0)
+    hardwaretype = int(response[8], 0)
+    if hardwaretype == 0x0d:
+        hardwaretype = "WPU"
+    elif hardwaretype == 0x0f:
+        hardwaretype = "AutoTemp"
+    productversion = int(response[9], 0)
+    listversion = int(response[10], 0)
+
+    logger.info(f"ManufacturerGroup: {manufacturergroup}, Manufacturer: {manufacturer}, "
+                f"HardwareType: {hardwaretype}, ProductVersion: {productversion}, "
+                f"ListVersion: {listversion}")
 
 
 def process_datalog(response):
