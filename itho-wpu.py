@@ -151,14 +151,21 @@ class I2CMaster:
 
 
 def process_response(action, response, args):
-    if action == "getdatalog" and int(response[1], 0) == 0xA4 and int(response[2], 0) == 0x01:
-        measurements = process_datalog(response)
+    if int(response[3], 0) != 0x01:
+        logger.error(f"Response MessageType != 0x01 (response), but {response[3]}")
+        return
 
-    if args.export_to_influxdb:
-        export_to_influxdb(action, measurements)
+    if action == "getdatalog":
+        measurements = process_datalog(response)
+        if args.export_to_influxdb:
+            export_to_influxdb(action, measurements)
 
 
 def process_datalog(response):
+    if int(response[1], 0) != 0xA4 and int(response[2], 0) != 0x01:
+        logger.error(f"Response MessageClass != 0xA4 0x01 (getdatalog), but {response[1]} {response[2]}")
+        return
+
     # 0 = Byte
     # 1 = UnsignedInt
     # 2 = SignedIntDec2
