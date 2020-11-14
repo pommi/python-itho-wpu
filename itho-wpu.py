@@ -89,7 +89,7 @@ class I2CSlave():
             logger.debug(f"Received {b} bytes! Status {s}")
             result = [hex(c) for c in d]
             logger.debug(f"Callback Response: {result}")
-            if self.is_checksum_valid(result):
+            if self.is_checksum_valid(result) and self.is_length_valid(result):
                 self.queue.put(result)
         else:
             logger.debug(f"Received number of bytes was {b}")
@@ -103,6 +103,14 @@ class I2CSlave():
             checksum = 0
         if checksum != int(b[-1], 0):
             logger.debug(f"Checksum invalid (0x{checksum:02x} != {b[-1]})")
+            return False
+        return True
+
+    def is_length_valid(self, b):
+        length_in_msg = int(b[4], 0)
+        actual_length = len(b) - 6
+        if length_in_msg != actual_length:
+            logger.debug(f"Length invalid ({length_in_msg} != {actual_length})")
             return False
         return True
 
