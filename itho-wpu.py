@@ -177,6 +177,8 @@ def process_response(action, response, args):
             export_to_influxdb(action, measurements)
     elif action == "getnodeid":
         process_nodeid(response)
+    elif action == "getserial":
+        process_serial(response)
 
 
 def process_nodeid(response):
@@ -197,6 +199,14 @@ def process_nodeid(response):
     logger.info(f"ManufacturerGroup: {manufacturergroup}, Manufacturer: {manufacturer}, "
                 f"HardwareType: {hardwaretype}, ProductVersion: {productversion}, "
                 f"ListVersion: {listversion}")
+
+
+def process_serial(response):
+    if int(response[1], 0) != 0x90 and int(response[2], 0) != 0xE1:
+        logger.error(f"Response MessageClass != 0x90 0xE1 (getserial), but {response[1]} {response[2]}")
+        return
+    serial = (int(response[5], 0) << 16) + (int(response[6], 0) << 8) + int(response[7], 0)
+    logger.info(f"Serial: {serial}")
 
 
 def process_datalog(response):
