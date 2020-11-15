@@ -42,17 +42,19 @@ def export_to_influxdb(action, measurements):
         print('Failed to write to influxdb: ', e)
 
 
+actions = {
+    "getnodeid": [0x90, 0xE0],
+    "getserial": [0x90, 0xE1],
+    "getdatatype": [0xA4, 0x00],
+    "getdatalog": [0xA4, 0x01],
+}
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Itho WPU i2c master')
 
-    actions = [
-        "getnodeid",
-        "getserial",
-        "getdatatype",
-        "getdatalog",
-    ]
     parser.add_argument('--action', nargs='?', required=True,
-                        choices=actions, help="Execute an action")
+                        choices=actions.keys(), help="Execute an action")
     parser.add_argument('--loglevel', nargs='?',
                         choices=["debug", "info", "warning", "error", "critical"],
                         help="Loglevel")
@@ -126,12 +128,6 @@ class I2CMaster:
         self.queue = queue
 
     def compose_request(self, action):
-        actions = {
-            "getnodeid": [0x90, 0xE0],
-            "getserial": [0x90, 0xE1],
-            "getdatatype": [0xA4, 0x00],
-            "getdatalog": [0xA4, 0x01],
-        }
         # 0x80 = source, 0x04 = msg_type, 0x00 = length
         request = [0x80] + actions[action] + [0x04, 0x00]
         request.append(self.calculate_checksum(request))
@@ -166,9 +162,19 @@ class I2CMaster:
         self.i.close()
 
 
+def is_messageclass_valid(action, response):
+    if int(response[1], 0) != actions[action][0] and int(response[2], 0) != actions[action][1]:
+        logger.error(f"Response MessageClass != {actions[action][0]} {actions[action][1]} "
+                     f"({action}), but {response[1]} {response[2]}")
+        return False
+    return True
+
+
 def process_response(action, response, args):
     if int(response[3], 0) != 0x01:
         logger.error(f"Response MessageType != 0x01 (response), but {response[3]}")
+        return
+    if not is_messageclass_valid(action, response):
         return
 
     if action == "getdatalog":
@@ -182,10 +188,6 @@ def process_response(action, response, args):
 
 
 def process_nodeid(response):
-    if int(response[1], 0) != 0x90 and int(response[2], 0) != 0xE0:
-        logger.error(f"Response MessageClass != 0x90 0xE0 (getnodeid), but {response[1]} {response[2]}")
-        return
-
     manufacturergroup = ((int(response[5], 0) << 8) + int(response[6], 0))
     manufacturer = int(response[7], 0)
     hardwaretype = int(response[8], 0)
@@ -202,18 +204,11 @@ def process_nodeid(response):
 
 
 def process_serial(response):
-    if int(response[1], 0) != 0x90 and int(response[2], 0) != 0xE1:
-        logger.error(f"Response MessageClass != 0x90 0xE1 (getserial), but {response[1]} {response[2]}")
-        return
     serial = (int(response[5], 0) << 16) + (int(response[6], 0) << 8) + int(response[7], 0)
     logger.info(f"Serial: {serial}")
 
 
 def process_datalog(response):
-    if int(response[1], 0) != 0xA4 and int(response[2], 0) != 0x01:
-        logger.error(f"Response MessageClass != 0xA4 0x01 (getdatalog), but {response[1]} {response[2]}")
-        return
-
     # 0 = Byte
     # 1 = UnsignedInt
     # 2 = SignedIntDec2
