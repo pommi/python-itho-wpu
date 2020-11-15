@@ -125,17 +125,33 @@ class I2CMaster:
         self.i = i2c_raw.I2CRaw(address=address, bus=bus)
         self.queue = queue
 
-    def execute_action(self, action):
+    def compose_request(self, action):
         actions = {
-            "getnodeid": [0x80, 0x90, 0xE0, 0x04, 0x00, 0x8A],
-            "getserial": [0x80, 0x90, 0xE1, 0x04, 0x00, 0x89],
-            "getdatatype": [0x80, 0xA4, 0x00, 0x04, 0x00, 0x56],
-            "getdatalog": [0x80, 0xA4, 0x01, 0x04, 0x00, 0x55],
+            "getnodeid": [0x90, 0xE0],
+            "getserial": [0x90, 0xE1],
+            "getdatatype": [0xA4, 0x00],
+            "getdatalog": [0xA4, 0x01],
         }
+        # 0x80 = source, 0x04 = msg_type, 0x00 = length
+        request = [0x80] + actions[action] + [0x04, 0x00]
+        request.append(self.calculate_checksum(request))
+        return request
+
+    def calculate_checksum(self, request):
+        s = 0x82
+        for i in request:
+            s += i
+        checksum = 256 - (s % 256)
+        if checksum == 256:
+            checksum = 0
+        return checksum
+
+    def execute_action(self, action):
+        request = self.compose_request(action)
         result = None
         for i in range(0, 20):
             logger.debug(f"Executing action: {action}")
-            self.i.write_i2c_block_data(actions[action])
+            self.i.write_i2c_block_data(request)
             time.sleep(0.21)
             logger.debug("Queue size: {}".format(self.queue.qsize()))
             if self.queue.qsize() > 0:
