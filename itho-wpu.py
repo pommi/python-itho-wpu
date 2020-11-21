@@ -188,13 +188,18 @@ def process_response(action, response, args):
 
 
 def process_nodeid(response):
+    hardware_info = {
+        0: {
+            "name": "HCCP",
+            "type": {
+                13: "WPU",
+                15: "Autotemp",
+            }
+        }
+    }
     manufacturergroup = ((int(response[5], 0) << 8) + int(response[6], 0))
-    manufacturer = int(response[7], 0)
-    hardwaretype = int(response[8], 0)
-    if hardwaretype == 0x0d:
-        hardwaretype = "WPU"
-    elif hardwaretype == 0x0f:
-        hardwaretype = "AutoTemp"
+    manufacturer = hardware_info[int(response[7], 0)]["name"]
+    hardwaretype = hardware_info[int(response[7], 0)]["type"][int(response[8], 0)]
     productversion = int(response[9], 0)
     listversion = int(response[10], 0)
 
