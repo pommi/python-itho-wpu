@@ -1,1 +1,3 @@
 pigpio
+pyodbc
+sqlite3
