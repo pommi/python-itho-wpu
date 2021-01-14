@@ -9,6 +9,7 @@ import sys
 import time
 import os
 import datetime
+import json
 from collections import namedtuple
 
 consolelogformatter = logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
@@ -62,6 +63,8 @@ def parse_args():
     parser.add_argument('--slave-only', action='store_true', help="Only run I2C slave")
     parser.add_argument('--slave-timeout', nargs='?', type=int, default=60,
                         help="Slave timeout in seconds when --slave-only")
+    parser.add_argument('--no-cache', action='store_true',
+                        help="Don't use local cache")
     parser.add_argument('--export-to-influxdb', action='store_true',
                         help="Export results to InfluxDB")
 
@@ -163,14 +166,22 @@ class I2CMaster:
 
 
 class IthoWPU():
-    def __init__(self, master_only, slave_only, slave_timeout):
+    def __init__(self, master_only, slave_only, slave_timeout, no_cache):
         self.master_only = master_only
         self.slave_only = slave_only
         self.slave_timeout = slave_timeout
         self._q = queue.Queue()
+        self.no_cache = no_cache
+        self.cache = IthoWPUCache()
 
     def get(self, action):
-        reponse = None
+        if not self.no_cache:
+            response = self.cache.get(action.replace('get', ''))
+            if response is not None:
+                logger.debug(f"Response (from cache): {response}")
+                return response
+
+        response = None
 
         if not self.master_only:
             slave = I2CSlave(address=0x40, queue=self._q)
@@ -188,7 +199,54 @@ class IthoWPU():
         if not self.master_only:
             slave.close()
 
+        self.cache.set(action.replace('get', ''), response)
+
         return response
+
+
+class IthoWPUCache:
+    def __init__(self):
+        self._cache_file = "itho-wpu-cache.json"
+        self._cache_data = {
+            'nodeid': None,
+            'serial': None,
+            'datatype': None,
+            'schema_version': '1',
+        }
+        self._read_cache()
+
+    def _read_cache(self):
+        if not os.path.exists(self._cache_file):
+            logger.debug(f"Not loading cache file: {self._cache_file} does not exist")
+            return
+        with open(self._cache_file) as cache_file:
+            cache_data = json.load(cache_file)
+            logger.debug(f"Loading local cache: {json.dumps(cache_data)}")
+            for key in ['nodeid', 'serial', 'datatype']:
+                if key in cache_data:
+                    self._cache_data[key] = cache_data[key]
+
+    def _write_cache(self):
+        with open(self._cache_file, 'w') as cache_file:
+            logger.debug(f"Writing to local cache: {json.dumps(self._cache_data)}")
+            json.dump(self._cache_data, cache_file)
+
+    def get(self, action):
+        if action not in ['nodeid', 'serial', 'datatype']:
+            logger.debug(f"Cache for '{action}' is not supported")
+            return None
+        logger.debug(f"Reading '{action}' from local cache")
+        if self._cache_data[action] is None:
+            logger.debug(f"Action '{action}' is not present in local cache")
+        return self._cache_data[action]
+
+    def set(self, action, value):
+        if action not in ['nodeid', 'serial', 'datatype']:
+            logger.debug(f"Cache for '{action}' is not supported")
+            return None
+        logger.debug(f"Writing '{action}' to local cache: {value}")
+        self._cache_data[action] = value
+        self._write_cache()
 
 
 def is_messageclass_valid(action, response):
@@ -304,7 +362,7 @@ if __name__ == "__main__":
     if args.loglevel:
         logger.setLevel(args.loglevel.upper())
 
-    wpu = IthoWPU(args.master_only, args.slave_only, args.slave_timeout)
+    wpu = IthoWPU(args.master_only, args.slave_only, args.slave_timeout, args.no_cache)
     response = wpu.get(args.action)
     if response is not None:
         process_response(args.action, response, args)
