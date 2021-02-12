@@ -173,6 +173,8 @@ class IthoWPU():
         self._q = queue.Queue()
         self.no_cache = no_cache
         self.cache = IthoWPUCache()
+        self.nodeid = self.get('getnodeid')
+        self.datatype = self.get('getdatatype')
 
     def get(self, action):
         if not self.no_cache:
