@@ -341,12 +341,15 @@ def process_datalog(response):
     message = response[5:]
     measurements = {}
     for d in datalog:
-        if d.type == 0x0 or d.type == 0x12 or d.type == 0xc:
+        if d.type == 0x0 or d.type == 0xc:
             m = message[d.index:d.index+1]
             num = int(m[0], 0)
         elif d.type == 0x10:
             m = message[d.index:d.index+2]
             num = ((int(m[0], 0) << 8) + int(m[1], 0))
+        elif d.type == 0x12:
+            m = message[d.index:d.index+2]
+            num = round((int(m[0], 0) << 8) + int(m[1], 0) / 100, 2)
         elif d.type == 0x92:
             m = message[d.index:d.index+2]
             num = ((int(m[0], 0) << 8) + int(m[1], 0))
