@@ -1,1 +1,4 @@
+.envrc
+__pycache__/
+heatpump.sqlite
 itho-wpu-cache.json
