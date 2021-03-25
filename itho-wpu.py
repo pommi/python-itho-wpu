@@ -233,6 +233,7 @@ class IthoWPU():
             description = dl['title'].title()
             if dl['unit'] is not None:
                 description = f"{description} ({dl['unit']})"
+            description = f"{description} ({dl['name'].lower()})"
             datalog.append(Field(index, int(dt, 0), dl['name'].lower(), description))
 
             if dt in ['0x0', '0xc']:
