@@ -2,6 +2,8 @@
 
 A python library and a set of command line tools to communicate with an Itho WPU.
 
+[![Itho WPU Grafana Demo](assets/itho-wpu-grafana-demo.gif)](#grafana-dashboard)
+
 # Hardware installation
 
 See the [pislave](https://github.com/ootjersb/pislave#wiring) project
@@ -128,3 +130,9 @@ Assuming InfluxDB is running on the Raspberry Pi as well.
    */5 * * * * root cd /root/python-itho-wpu && direnv exec . ./itho-wpu.py --action getdatalog --export-to-influxdb >> /var/log/itho.log
    EOT
    ```
+
+## Grafana Dashboard
+
+The measurements collected in InfluxDB can be displayed using a Grafana dashboard.
+
+Download: [direct link](assets/grafana-influxdb-dashboard.json), [grafana.com](https://grafana.com/grafana/dashboards/14143)
