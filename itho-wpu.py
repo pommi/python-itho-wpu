@@ -13,11 +13,10 @@ import json
 import db
 from collections import namedtuple
 
-consolelogformatter = logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
 logger = logging.getLogger('stdout')
 logger.setLevel(logging.INFO)
 stdout_log_handler = logging.StreamHandler(sys.stdout)
-stdout_log_handler.setFormatter(consolelogformatter)
+stdout_log_handler.setFormatter(logging.Formatter("%(message)s"))
 logger.addHandler(stdout_log_handler)
 
 
@@ -60,6 +59,7 @@ def parse_args():
     parser.add_argument('--loglevel', nargs='?',
                         choices=["debug", "info", "warning", "error", "critical"],
                         help="Loglevel")
+    parser.add_argument('--timestamp', action='store_true', help="Show timestamp in output")
     parser.add_argument('--master-only', action='store_true', help="Only run I2C master")
     parser.add_argument('--slave-only', action='store_true', help="Only run I2C slave")
     parser.add_argument('--slave-timeout', nargs='?', type=int, default=60,
@@ -378,6 +378,11 @@ if __name__ == "__main__":
 
     if args.loglevel:
         logger.setLevel(args.loglevel.upper())
+
+    if args.timestamp:
+        stdout_log_handler.setFormatter(
+            logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
+        )
 
     wpu = IthoWPU(args.master_only, args.slave_only, args.slave_timeout, args.no_cache)
     response = wpu.get(args.action)
