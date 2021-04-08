@@ -6,7 +6,6 @@ import queue
 import sys
 import time
 import os
-import datetime
 import json
 import db
 from collections import namedtuple
@@ -17,29 +16,6 @@ logger.setLevel(logging.INFO)
 stdout_log_handler = logging.StreamHandler(sys.stdout)
 stdout_log_handler.setFormatter(logging.Formatter("%(message)s"))
 logger.addHandler(stdout_log_handler)
-
-
-def export_to_influxdb(action, measurements):
-    from influxdb import InfluxDBClient
-
-    influx_client = InfluxDBClient(
-        host=os.getenv('INFLUXDB_HOST', 'localhost'),
-        port=os.getenv('INFLUXDB_PORT', 8086),
-        username=os.getenv('INFLUXDB_USERNAME', 'root'),
-        password=os.getenv('INFLUXDB_PASSWORD', 'root'),
-        database=os.getenv('INFLUXDB_DATABASE')
-    )
-    json_body = [
-        {
-            "measurement": action,
-            "time": datetime.datetime.utcnow().replace(microsecond=0).isoformat(),
-            "fields": measurements,
-        }
-    ]
-    try:
-        influx_client.write_points(json_body)
-    except Exception as e:
-        print('Failed to write to influxdb: ', e)
 
 
 actions = {
@@ -217,6 +193,7 @@ def process_response(action, response, args, wpu):
     if action == "getdatalog":
         measurements = process_datalog(response, wpu)
         if args.export_to_influxdb:
+            from itho_export import export_to_influxdb
             export_to_influxdb(action, measurements)
     elif action == "getnodeid":
         process_nodeid(response)
