@@ -2,7 +2,7 @@ import sqlite3
 from sqlite3 import Error
 
 
-class sqlite():
+class sqlite:
     def __init__(self, db_file):
         self.conn = self.connect(db_file)
 
@@ -34,15 +34,17 @@ class sqlite():
             print("Error:", e)
 
     def create_table(self, t):
-        if t.startswith('datalabel'):
+        if t.startswith("datalabel"):
             query = """CREATE TABLE {} (
                 id real,
                 name text,
                 title text,
                 tooltip text,
                 unit text
-            );""".format(t)
-        elif t.startswith('parameterlijst'):
+            );""".format(
+                t
+            )
+        elif t.startswith("parameterlijst"):
             query = """
             CREATE TABLE {} (
                 id real,
@@ -54,32 +56,42 @@ class sqlite():
                 title text,
                 description text,
                 unit text
-            );""".format(t)
-        elif t.startswith('versiebeheer'):
+            );""".format(
+                t
+            )
+        elif t.startswith("versiebeheer"):
             query = """
             CREATE TABLE {} (
                 version integer primary key,
                 datalabel integer,
                 parameterlist integer
-            );""".format(t)
+            );""".format(
+                t
+            )
         self.execute(query)
         self.conn.commit()
 
     def insert(self, t, data):
-        if t.startswith('datalabel'):
+        if t.startswith("datalabel"):
             query = """
             INSERT INTO {} (id, name, title, tooltip, unit)
             VALUES (?, ?, ?, ?, ?);
-            """.format(t)
-        elif t.startswith('parameterlijst'):
+            """.format(
+                t
+            )
+        elif t.startswith("parameterlijst"):
             query = """
             INSERT INTO {} (id, name, name_factory, min, max, def, title, description, unit)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """.format(t)
-        elif t.startswith('versiebeheer'):
+            """.format(
+                t
+            )
+        elif t.startswith("versiebeheer"):
             query = """
             INSERT INTO {} (version, datalabel, parameterlist)
             VALUES (?, ?, ?);
-            """.format(t)
+            """.format(
+                t
+            )
         self.executemany(query, data)
         self.conn.commit()

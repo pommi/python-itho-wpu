@@ -14,27 +14,31 @@ import sys
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                     description='Convert Itho Servicetool database to SQLite')
-    parser.add_argument('--itho-db', nargs='?', required=True, help="Itho Database file")
-    parser.add_argument('--sqlite-db', nargs='?', default='heatpump.sqlite', help="Itho Database file")
-    parser.add_argument('--force', action='store_true', help="Force overwrite SQLite database")
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="Convert Itho Servicetool database to SQLite",
+    )
+    parser.add_argument("--itho-db", nargs="?", required=True, help="Itho Database file")
+    parser.add_argument(
+        "--sqlite-db", nargs="?", default="heatpump.sqlite", help="Itho Database file"
+    )
+    parser.add_argument("--force", action="store_true", help="Force overwrite SQLite database")
     args = parser.parse_args()
     return args
 
 
 def convert(par_file, sqlite_db):
     par_file = par_file.replace("$", "\\$")
-    par_conn = pyodbc.connect(f'DRIVER={{MDBTools}};DBQ={par_file};')
-    par_conn.setencoding('UTF-8')
-    par_conn.setdecoding(pyodbc.SQL_CHAR, encoding='UTF-8')
+    par_conn = pyodbc.connect(f"DRIVER={{MDBTools}};DBQ={par_file};")
+    par_conn.setencoding("UTF-8")
+    par_conn.setdecoding(pyodbc.SQL_CHAR, encoding="UTF-8")
     par_cur = par_conn.cursor()
 
     sqlite_db = db.sqlite(sqlite_db)
 
     tables = []
-    for table_info in par_cur.tables(tableType='TABLE'):
-        if re.match('^(VersieBeheer|Data[Ll]abel|Parameterlijst)', table_info.table_name):
+    for table_info in par_cur.tables(tableType="TABLE"):
+        if re.match("^(VersieBeheer|Data[Ll]abel|Parameterlijst)", table_info.table_name):
             tables.append(table_info.table_name)
 
     for t in sorted(tables):
@@ -46,10 +50,25 @@ def convert(par_file, sqlite_db):
             for r in sorted(rows):
                 data.append((r.Index, r.Naam, r.Tekst_NL, r.Tooltip_NL, r.Eenheid_NL))
         if re.match("^Parameterlijst", t):
-            par_cur.execute(f"select Index, Naam, Naam_fabriek, Min, Max, Default, Tekst_NL, Omschrijving_NL, Eenheid_NL from {t}")
+            par_cur.execute(
+                "select Index, Naam, Naam_fabriek, Min, Max, Default, "
+                f"Tekst_NL, Omschrijving_NL, Eenheid_NL from {t}"
+            )
             rows = par_cur.fetchall()
             for r in sorted(rows):
-                data.append((r.Index, r.Naam, r.Naam_fabriek, r.Min, r.Max, r.Default, r.Tekst_NL, r.Omschrijving_NL, r.Eenheid_NL))
+                data.append(
+                    (
+                        r.Index,
+                        r.Naam,
+                        r.Naam_fabriek,
+                        r.Min,
+                        r.Max,
+                        r.Default,
+                        r.Tekst_NL,
+                        r.Omschrijving_NL,
+                        r.Eenheid_NL,
+                    )
+                )
         if re.match("^VersieBeheer", t):
             par_cur.execute(f"select VersieNummer, DataLabel, ParameterLijst from {t}")
             rows = par_cur.fetchall()

@@ -32,7 +32,7 @@ class I2CRaw:
 
     def read_i2c_block_data(self, n_bytes):
         data_raw = self.fr.read(n_bytes)
-        unpack_format = 'B'*n_bytes
+        unpack_format = "B" * n_bytes
         return list(struct.unpack(unpack_format, data_raw))
 
     def close(self):
@@ -80,7 +80,7 @@ class I2CMaster:
         self.i.close()
 
 
-class I2CSlave():
+class I2CSlave:
     def __init__(self, address, queue):
         self.address = address
         self.queue = queue

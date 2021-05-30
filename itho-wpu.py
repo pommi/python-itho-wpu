@@ -11,7 +11,7 @@ import db
 from collections import namedtuple
 from itho_i2c import I2CMaster, I2CSlave
 
-logger = logging.getLogger('stdout')
+logger = logging.getLogger("stdout")
 logger.setLevel(logging.INFO)
 stdout_log_handler = logging.StreamHandler(sys.stdout)
 stdout_log_handler.setFormatter(logging.Formatter("%(message)s"))
@@ -27,28 +27,43 @@ actions = {
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Itho WPU i2c master')
+    parser = argparse.ArgumentParser(description="Itho WPU i2c master")
 
-    parser.add_argument('--action', nargs='?', required=True,
-                        choices=actions.keys(), help="Execute an action")
-    parser.add_argument('--loglevel', nargs='?',
-                        choices=["debug", "info", "warning", "error", "critical"],
-                        help="Loglevel")
-    parser.add_argument('--timestamp', action='store_true', help="Show timestamp in output")
-    parser.add_argument('--master-only', action='store_true', help="Only run I2C master")
-    parser.add_argument('--slave-only', action='store_true', help="Only run I2C slave")
-    parser.add_argument('--slave-timeout', nargs='?', type=int, default=60,
-                        help="Slave timeout in seconds when --slave-only")
-    parser.add_argument('--no-cache', action='store_true',
-                        help="Don't use local cache")
-    parser.add_argument('--export-to-influxdb', action='store_true',
-                        help="Export results to InfluxDB")
+    parser.add_argument(
+        "--action",
+        nargs="?",
+        required=True,
+        choices=actions.keys(),
+        help="Execute an action",
+    )
+    parser.add_argument(
+        "--loglevel",
+        nargs="?",
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Loglevel",
+    )
+    parser.add_argument("--timestamp", action="store_true", help="Show timestamp in output")
+    parser.add_argument("--master-only", action="store_true", help="Only run I2C master")
+    parser.add_argument("--slave-only", action="store_true", help="Only run I2C slave")
+    parser.add_argument(
+        "--slave-timeout",
+        nargs="?",
+        type=int,
+        default=60,
+        help="Slave timeout in seconds when --slave-only",
+    )
+    parser.add_argument("--no-cache", action="store_true", help="Don't use local cache")
+    parser.add_argument(
+        "--export-to-influxdb",
+        action="store_true",
+        help="Export results to InfluxDB",
+    )
 
     args = parser.parse_args()
     return args
 
 
-class IthoWPU():
+class IthoWPU:
     def __init__(self, master_only, slave_only, slave_timeout, no_cache):
         self.master_only = master_only
         self.slave_only = slave_only
@@ -56,13 +71,13 @@ class IthoWPU():
         self._q = queue.Queue()
         self.no_cache = no_cache
         self.cache = IthoWPUCache()
-        self.nodeid = self.get('getnodeid')
-        self.datatype = self.get('getdatatype')
-        self.heatpump_db = db.sqlite('heatpump.sqlite')
+        self.nodeid = self.get("getnodeid")
+        self.datatype = self.get("getdatatype")
+        self.heatpump_db = db.sqlite("heatpump.sqlite")
 
     def get(self, action):
         if not self.no_cache:
-            response = self.cache.get(action.replace('get', ''))
+            response = self.cache.get(action.replace("get", ""))
             if response is not None:
                 logger.debug(f"Response (from cache): {response}")
                 return response
@@ -85,7 +100,7 @@ class IthoWPU():
         if not self.master_only:
             slave.close()
 
-        self.cache.set(action.replace('get', ''), response)
+        self.cache.set(action.replace("get", ""), response)
 
         return response
 
@@ -97,32 +112,37 @@ class IthoWPU():
     def get_datalog_structure(self):
         listversion = self.get_listversion_from_nodeid()
         datalabel_version = self.heatpump_db.execute(
-            f"SELECT datalabel FROM versiebeheer WHERE version = {listversion}")[0]['datalabel']
+            f"SELECT datalabel FROM versiebeheer WHERE version = {listversion}"
+        )[0]["datalabel"]
         if datalabel_version is None or not type(datalabel_version) == int:
             logger.error(f"Datalabel not found in database for version {listversion}")
             return None
         datalabel = self.heatpump_db.execute(
-            f"SELECT name, title, tooltip, unit FROM datalabel_v{datalabel_version} order by id")
+            f"SELECT name, title, tooltip, unit FROM datalabel_v{datalabel_version} order by id"
+        )
 
         if len(self.datatype[5:-1]) != len(datalabel):
-            logger.warning(f"Number of datatype items ({len(self.datatype[5:-1])}) is not equal to the number of datalabels ({len(datalabel)}) in the database.")
+            logger.warning(
+                f"Number of datatype items ({len(self.datatype[5:-1])}) is not equal to "
+                f"the number of datalabels ({len(datalabel)}) in the database."
+            )
 
-        Field = namedtuple('Field', 'index type label description')
+        Field = namedtuple("Field", "index type label description")
 
         datalog = []
         index = 0
         for dl, dt in zip(datalabel, self.datatype[5:-1]):
-            description = dl['title'].title()
-            if dl['unit'] is not None:
+            description = dl["title"].title()
+            if dl["unit"] is not None:
                 description = f"{description} ({dl['unit']})"
             description = f"{description} ({dl['name'].lower()})"
-            datalog.append(Field(index, int(dt, 0), dl['name'].lower(), description))
+            datalog.append(Field(index, int(dt, 0), dl["name"].lower(), description))
 
-            if dt in ['0x0', '0xc']:
+            if dt in ["0x0", "0xc"]:
                 index = index + 1
-            elif dt in ['0x10', '0x12', '0x92']:
+            elif dt in ["0x10", "0x12", "0x92"]:
                 index = index + 2
-            elif dt in ['0x20']:
+            elif dt in ["0x20"]:
                 index = index + 4
             else:
                 logger.error(f"Unknown data type for label {dl['name']}: {dt}")
@@ -134,10 +154,10 @@ class IthoWPUCache:
     def __init__(self):
         self._cache_file = "itho-wpu-cache.json"
         self._cache_data = {
-            'nodeid': None,
-            'serial': None,
-            'datatype': None,
-            'schema_version': '1',
+            "nodeid": None,
+            "serial": None,
+            "datatype": None,
+            "schema_version": "1",
         }
         self._read_cache()
 
@@ -148,17 +168,17 @@ class IthoWPUCache:
         with open(self._cache_file) as cache_file:
             cache_data = json.load(cache_file)
             logger.debug(f"Loading local cache: {json.dumps(cache_data)}")
-            for key in ['nodeid', 'serial', 'datatype']:
+            for key in ["nodeid", "serial", "datatype"]:
                 if key in cache_data:
                     self._cache_data[key] = cache_data[key]
 
     def _write_cache(self):
-        with open(self._cache_file, 'w') as cache_file:
+        with open(self._cache_file, "w") as cache_file:
             logger.debug(f"Writing to local cache: {json.dumps(self._cache_data)}")
             json.dump(self._cache_data, cache_file)
 
     def get(self, action):
-        if action not in ['nodeid', 'serial', 'datatype']:
+        if action not in ["nodeid", "serial", "datatype"]:
             logger.debug(f"Cache for '{action}' is not supported")
             return None
         logger.debug(f"Reading '{action}' from local cache")
@@ -167,7 +187,7 @@ class IthoWPUCache:
         return self._cache_data[action]
 
     def set(self, action, value):
-        if action not in ['nodeid', 'serial', 'datatype']:
+        if action not in ["nodeid", "serial", "datatype"]:
             logger.debug(f"Cache for '{action}' is not supported")
             return None
         logger.debug(f"Writing '{action}' to local cache: {value}")
@@ -177,8 +197,10 @@ class IthoWPUCache:
 
 def is_messageclass_valid(action, response):
     if int(response[1], 0) != actions[action][0] and int(response[2], 0) != actions[action][1]:
-        logger.error(f"Response MessageClass != {actions[action][0]} {actions[action][1]} "
-                     f"({action}), but {response[1]} {response[2]}")
+        logger.error(
+            f"Response MessageClass != {actions[action][0]} {actions[action][1]} "
+            f"({action}), but {response[1]} {response[2]}"
+        )
         return False
     return True
 
@@ -194,6 +216,7 @@ def process_response(action, response, args, wpu):
         measurements = process_datalog(response, wpu)
         if args.export_to_influxdb:
             from itho_export import export_to_influxdb
+
             export_to_influxdb(action, measurements)
     elif action == "getnodeid":
         process_nodeid(response)
@@ -208,18 +231,20 @@ def process_nodeid(response):
             "type": {
                 13: "WPU",
                 15: "Autotemp",
-            }
+            },
         }
     }
-    manufacturergroup = ((int(response[5], 0) << 8) + int(response[6], 0))
+    manufacturergroup = (int(response[5], 0) << 8) + int(response[6], 0)
     manufacturer = hardware_info[int(response[7], 0)]["name"]
     hardwaretype = hardware_info[int(response[7], 0)]["type"][int(response[8], 0)]
     productversion = int(response[9], 0)
     listversion = int(response[10], 0)
 
-    logger.info(f"ManufacturerGroup: {manufacturergroup}, Manufacturer: {manufacturer}, "
-                f"HardwareType: {hardwaretype}, ProductVersion: {productversion}, "
-                f"ListVersion: {listversion}")
+    logger.info(
+        f"ManufacturerGroup: {manufacturergroup}, Manufacturer: {manufacturer}, "
+        f"HardwareType: {hardwaretype}, ProductVersion: {productversion}, "
+        f"ListVersion: {listversion}"
+    )
 
 
 def process_serial(response):
@@ -232,24 +257,24 @@ def process_datalog(response, wpu):
     message = response[5:]
     measurements = {}
     for d in datalog:
-        if d.type == 0x0 or d.type == 0xc:
-            m = message[d.index:d.index+1]
+        if d.type == 0x0 or d.type == 0xC:
+            m = message[d.index : d.index + 1]  # noqa: E203
             num = int(m[0], 0)
         elif d.type == 0x10:
-            m = message[d.index:d.index+2]
-            num = ((int(m[0], 0) << 8) + int(m[1], 0))
+            m = message[d.index : d.index + 2]  # noqa: E203
+            num = (int(m[0], 0) << 8) + int(m[1], 0)
         elif d.type == 0x12:
-            m = message[d.index:d.index+2]
+            m = message[d.index : d.index + 2]  # noqa: E203
             num = round((int(m[0], 0) << 8) + int(m[1], 0) / 100, 2)
         elif d.type == 0x92:
-            m = message[d.index:d.index+2]
-            num = ((int(m[0], 0) << 8) + int(m[1], 0))
+            m = message[d.index : d.index + 2]  # noqa: E203
+            num = (int(m[0], 0) << 8) + int(m[1], 0)
             if num >= 32768:
                 num -= 65536
             num = round(num / 100, 2)
         elif d.type == 0x20:
-            m = message[d.index:d.index+4]
-            num = ((int(m[0], 0) << 24) + (int(m[1], 0) << 16) + (int(m[2], 0) << 8) + int(m[3], 0))
+            m = message[d.index : d.index + 4]  # noqa: E203
+            num = (int(m[0], 0) << 24) + (int(m[1], 0) << 16) + (int(m[2], 0) << 8) + int(m[3], 0)
         else:
             logger.error(f"Unknown message type for datalog {d.name}: {d.type}")
         logger.info(f"{d.description}: {num}")
