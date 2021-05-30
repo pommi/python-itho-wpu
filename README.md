@@ -60,13 +60,13 @@ See the [pislave](https://github.com/ootjersb/pislave#wiring) project
 1. Extract `$_parameters_HeatPump.par` from the Itho Service Tool. This is a Microsoft Access database containing details about all WPU versions.
    * Download it directly:
      ```
-     curl -OL "https://servicetool.blob.core.windows.net/release/Parameters/\$_parameters_HeatPump.par"
+     curl -o HeatPump.par "https://servicetool.blob.core.windows.net/release/Parameters/\$_parameters_HeatPump.par"
      ```
-   * Or download the [Itho Service Tool](https://www.ithodaalderop.nl/nl-NL/professional/servicetool) and execute `AzureBootloader.exe` to retrieve the full Itho Service Tool application. `$_parameters_HeatPump.par` is located in the `Parameters` directory.
+   * Or download the [Itho Service Tool](https://www.ithodaalderop.nl/nl-NL/professional/servicetool) and execute `AzureBootloader.exe` to retrieve the full Itho Service Tool application. `$_parameters_HeatPump.par` is located in the `Parameters` directory. Save it as HeatPump.par in the python-itho-wpu folder.
 
 1. Convert the Microsoft Access database to an SQLite datbase. The SQLite database is used by python-itho-wpu.
    ```
-   ./convert-itho-db.py --itho-db \$_parameters_HeatPump.par
+   ./convert-itho-db.py --itho-db HeatPump.par
    ```
 
 # Example usage of python-itho-wpu
