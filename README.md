@@ -32,13 +32,15 @@ See the [pislave](https://github.com/ootjersb/pislave#wiring) project
    systemctl enable pigpiod
    ```
 
-   Install version 0.9.0-1 of odbc-mdbtools
+   Install version 0.9.3-1 of odbc-mdbtools
    ```
+   SOURCE=http://snapshot.debian.org/archive/debian/20210503T151244Z
    ARCH=$(dpkg --print-architecture)
-   curl -OL http://snapshot.debian.org/archive/debian/20201218T033640Z/pool/main/m/mdbtools/odbc-mdbtools_0.9.0-1_${ARCH}.deb
-   curl -OL http://snapshot.debian.org/archive/debian/20201218T033640Z/pool/main/m/mdbtools/libmdb3_0.9.0-1_${ARCH}.deb
-   curl -OL http://snapshot.debian.org/archive/debian/20201218T033640Z/pool/main/m/mdbtools/libmdbsql3_0.9.0-1_${ARCH}.deb
-   dpkg -i libmdb3_0.9.0-1_${ARCH}.deb libmdbsql3_0.9.0-1_${ARCH}.deb odbc-mdbtools_0.9.0-1_${ARCH}.deb
+   VERSION=0.9.3-1
+   curl -OL ${SOURCE}/pool/main/m/mdbtools/odbc-mdbtools_${VERSION}_${ARCH}.deb
+   curl -OL ${SOURCE}/pool/main/m/mdbtools/libmdb3_${VERSION}_${ARCH}.deb
+   curl -OL ${SOURCE}/pool/main/m/mdbtools/libmdbsql3_${VERSION}_${ARCH}.deb
+   dpkg -i libmdb3_${VERSION}_${ARCH}.deb libmdbsql3_${VERSION}_${ARCH}.deb odbc-mdbtools_${VERSION}_${ARCH}.deb
    ```
    *When executing `convert-itho-db.py` with mdbtools version ...*
    * *0.7.1-6 (Debian Buster) it fails with: `ValueError: the query contains a null character`*
