@@ -140,7 +140,7 @@ class IthoWPU:
 
             if dt in ["0x0", "0xc"]:
                 index = index + 1
-            elif dt in ["0x10", "0x12", "0x92"]:
+            elif dt in ["0x10", "0x12", "0x90", "0x92"]:
                 index = index + 2
             elif dt in ["0x20"]:
                 index = index + 4
@@ -266,6 +266,11 @@ def process_datalog(response, wpu):
         elif d.type == 0x12:
             m = message[d.index : d.index + 2]  # noqa: E203
             num = round((int(m[0], 0) << 8) + int(m[1], 0) / 100, 2)
+        elif d.type == 0x90:
+            m = message[d.index : d.index + 2]  # noqa: E203
+            num = (int(m[0], 0) << 8) + int(m[1], 0)
+            if num >= 32768:
+                num -= 65536
         elif d.type == 0x92:
             m = message[d.index : d.index + 2]  # noqa: E203
             num = (int(m[0], 0) << 8) + int(m[1], 0)
