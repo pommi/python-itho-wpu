@@ -132,17 +132,18 @@ class IthoWPU:
         datalog = []
         index = 0
         for dl, dt in zip(datalabel, self.datatype[5:-1]):
+            dt = int(dt, 0)
             description = dl["title"].title()
             if dl["unit"] is not None:
                 description = f"{description} ({dl['unit']})"
             description = f"{description} ({dl['name'].lower()})"
-            datalog.append(Field(index, int(dt, 0), dl["name"].lower(), description))
+            datalog.append(Field(index, dt, dl["name"].lower(), description))
 
-            if dt in ["0x0", "0xc"]:
+            if dt in [0x0, 0x1, 0x2, 0xC, 0xF, 0x6C, 0x80, 0x81, 0x82, 0x8F]:
                 index = index + 1
-            elif dt in ["0x10", "0x12", "0x90", "0x92"]:
+            elif dt in [0x10, 0x11, 0x12, 0x13, 0x14, 0x51, 0x90, 0x91, 0x92]:
                 index = index + 2
-            elif dt in ["0x20"]:
+            elif dt in [0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5]:
                 index = index + 4
             else:
                 logger.error(f"Unknown data type for label {dl['name']}: {dt}")
