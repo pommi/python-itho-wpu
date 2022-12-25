@@ -130,7 +130,7 @@ Assuming InfluxDB is running on the Raspberry Pi as well.
    cat > /etc/cron.d/itho <<EOT
    PATH=/usr/bin:/bin:/usr/sbin:/sbin
 
-   */5 * * * * root cd /root/python-itho-wpu && direnv exec . ./itho-wpu.py --action getdatalog --export-to-influxdb >> /var/log/itho.log
+   */5 * * * * root cd /root/python-itho-wpu && DIRENV_LOG_FORMAT='' direnv exec . ./itho-wpu.py --action getdatalog --export-to-influxdb >> /var/log/itho.log
    EOT
    ```
 
