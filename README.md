@@ -21,6 +21,7 @@ See the [pislave](https://github.com/ootjersb/pislave#wiring) project
        pigpiod \          # Pigpio daemon to communicate over the I2C bus
        python3-pigpio \   # Python module to talk to the pigpio daemon
        python3-pyodbc \   # Python module to access an ODBC database
+       odbcinst1debian2 \ # Library for accessing ODBC config files (odbc-mdbtools dependency)
        sqlite3 \          # To store a subset of the Itho database in SQLite
        direnv \           # Environment variable manager to store credentials for InfluxDB
        python3-influxdb   # To export measurements to InfluxDB
