@@ -62,6 +62,8 @@ class I2CMaster:
 
     def execute_action(self, action):
         request = self.compose_request(action)
+        request_in_hex = [hex(c) for c in request]
+        logger.debug(f"Request: {request_in_hex}")
         result = None
         for i in range(0, 20):
             logger.debug(f"Executing action: {action}")
