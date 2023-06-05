@@ -23,6 +23,7 @@ actions = {
     "getserial": [0x90, 0xE1],
     "getdatatype": [0xA4, 0x00],
     "getdatalog": [0xA4, 0x01],
+    "getsetting": [0xA4, 0x10],
 }
 
 
@@ -35,6 +36,12 @@ def parse_args():
         required=True,
         choices=actions.keys(),
         help="Execute an action",
+    )
+    parser.add_argument(
+        "--settingid",
+        nargs="?",
+        type=int,
+        help="Setting identifier",
     )
     parser.add_argument(
         "--loglevel",
@@ -75,7 +82,7 @@ class IthoWPU:
         self.datatype = self.get("getdatatype")
         self.heatpump_db = db.sqlite("heatpump.sqlite")
 
-    def get(self, action):
+    def get(self, action, identifier=None):
         if not self.no_cache:
             response = self.cache.get(action.replace("get", ""))
             if response is not None:
@@ -93,7 +100,7 @@ class IthoWPU:
         if not self.slave_only:
             master = I2CMaster(address=0x41, bus=1, queue=self._q)
             if action:
-                response = master.execute_action(action)
+                response = master.execute_action(action, identifier)
                 logger.debug(f"Response: {response}")
             master.close()
 
@@ -149,6 +156,22 @@ class IthoWPU:
                 logger.error(f"Unknown data type for label {dl['name']}: {dt}")
                 return datalog
         return datalog
+
+    def get_setting_by_id(self, settingid):
+        listversion = self.get_listversion_from_nodeid()
+        parameterlist_version = self.heatpump_db.execute(
+            f"SELECT parameterlist FROM versiebeheer WHERE version = {listversion}"
+        )[0]["parameterlist"]
+        if parameterlist_version is None or not type(parameterlist_version) == int:
+            logger.error(f"Parameterlist not found in database for version {listversion}")
+            return None
+        setting_details = self.heatpump_db.execute(
+            "SELECT name, min, max, def, title, description, unit "
+            + f"FROM parameterlijst_v{parameterlist_version} WHERE id = {settingid}"
+        )
+        if len(setting_details) != 1:
+            return None
+        return setting_details[0]
 
 
 class IthoWPUCache:
@@ -219,6 +242,8 @@ def process_response(action, response, args, wpu):
             from itho_export import export_to_influxdb
 
             export_to_influxdb(action, measurements)
+    elif action == "getsetting":
+        process_setting(response, wpu)
     elif action == "getnodeid":
         process_nodeid(response)
     elif action == "getserial":
@@ -272,6 +297,48 @@ def process_datalog(response, wpu):
     return measurements
 
 
+def parse_setting(response, wpu):
+    message = response[5:]
+
+    settingid = int(message[17], 0)
+    setting = wpu.get_setting_by_id(settingid)
+    if setting is None:
+        logger.error(f"Setting '{settingid}' is invalid")
+        return
+
+    datatype = message[16]
+    value = format_datatype(setting["name"], message[0:4], datatype)
+    minimum = format_datatype(setting["name"], message[4:8], datatype)
+    maximum = format_datatype(setting["name"], message[8:12], datatype)
+    step = format_datatype(setting["name"], message[12:16], datatype)
+
+    return value, minimum, maximum, step
+
+
+def process_setting(response, wpu):
+    message = response[5:]
+
+    settingid = int(message[17], 0)
+    setting = wpu.get_setting_by_id(settingid)
+    if setting is None:
+        logger.error(f"Setting '{settingid}' is invalid")
+        return
+
+    value, minimum, maximum, step = parse_setting(response, wpu)
+
+    logger.info(
+        "{}. {}{}: {} (min: {}, max: {}, step: {})".format(
+            settingid,
+            setting["title"].title(),
+            f' ({setting["unit"]})' if setting["unit"] is not None else "",
+            value,
+            minimum,
+            maximum,
+            step,
+        )
+    )
+
+
 def format_datatype(name, m, dt):
     """
     Transform a list of bytes to a readable number based on the datatype.
@@ -288,14 +355,46 @@ def format_datatype(name, m, dt):
 
     if dt == 0x0 or dt == 0xC:
         num = int(m[-1], 0)
+    elif dt == 0x1:
+        num = round(int(m[-1], 0) / 10, 1)
+    elif dt == 0x2:
+        num = round(int(m[-1], 0) / 100, 2)
     elif dt == 0x10:
         num = (int(m[-2], 0) << 8) + int(m[-1], 0)
     elif dt == 0x12:
         num = round((int(m[-2], 0) << 8) + int(m[-1], 0) / 100, 2)
+    elif dt == 0x13:
+        num = round((int(m[-2], 0) << 8) + int(m[-1], 0) / 1000, 3)
+    elif dt == 0x14:
+        num = round((int(m[-2], 0) << 8) + int(m[-1], 0) / 10000, 4)
+    elif dt == 0x80:
+        num = int(m[-1], 0)
+        if num >= 128:
+            num -= 256
+    elif dt == 0x81:
+        num = int(m[-1], 0)
+        if num >= 128:
+            num -= 256
+        num = round(num / 10, 1)
+    elif dt == 0x82:
+        num = int(m[-1], 0)
+        if num >= 128:
+            num -= 256
+        num = round(num / 100, 2)
+    elif dt == 0x8F:
+        num = int(m[-1], 0)
+        if num >= 128:
+            num -= 256
+        num = round(num / 1000, 3)
     elif dt == 0x90:
         num = (int(m[-2], 0) << 8) + int(m[-1], 0)
         if num >= 32768:
             num -= 65536
+    elif dt == 0x91:
+        num = (int(m[-2], 0) << 8) + int(m[-1], 0)
+        if num >= 32768:
+            num -= 65536
+        num = round(num / 10, 2)
     elif dt == 0x92:
         num = (int(m[-2], 0) << 8) + int(m[-1], 0)
         if num >= 32768:
@@ -308,7 +407,7 @@ def format_datatype(name, m, dt):
     return num
 
 
-if __name__ == "__main__":
+def main():
     args = parse_args()
 
     if args.loglevel:
@@ -319,7 +418,15 @@ if __name__ == "__main__":
             logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
         )
 
+    if args.action == "getsetting" and args.settingid is None:
+        logger.error("`--settingid` is required with `--action getsetting`")
+        return
+
     wpu = IthoWPU(args.master_only, args.slave_only, args.slave_timeout, args.no_cache)
-    response = wpu.get(args.action)
+    response = wpu.get(args.action, args.settingid)
     if response is not None:
         process_response(args.action, response, args, wpu)
+
+
+if __name__ == "__main__":
+    main()

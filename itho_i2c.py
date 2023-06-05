@@ -12,6 +12,7 @@ actions = {
     "getserial": [0x90, 0xE1],
     "getdatatype": [0xA4, 0x00],
     "getdatalog": [0xA4, 0x01],
+    "getsetting": [0xA4, 0x10],
 }
 
 
@@ -45,9 +46,21 @@ class I2CMaster:
         self.i = I2CRaw(address=address, bus=bus)
         self.queue = queue
 
-    def compose_request(self, action):
-        # 0x80 = source, 0x04 = msg_type, 0x00 = length
-        request = [0x80] + actions[action] + [0x04, 0x00]
+    def compose_request(self, action, identifier):
+        if action == "getsetting":
+            request = (
+                [0x80]
+                + actions[action]
+                + [0x04, 0x13]  # read, length
+                + [0x00, 0x00, 0x00, 0x00]  # current
+                + [0x00, 0x00, 0x00, 0x00]  # min
+                + [0x00, 0x00, 0x00, 0x00]  # max
+                + [0x00, 0x00, 0x00, 0x00]  # step
+                + [0x00, identifier, 0x00]
+            )
+        else:
+            # 0x80 = source, 0x04 = msg_type, 0x00 = length
+            request = [0x80] + actions[action] + [0x04, 0x00]
         request.append(self.calculate_checksum(request))
         return request
 
@@ -60,8 +73,8 @@ class I2CMaster:
             checksum = 0
         return checksum
 
-    def execute_action(self, action):
-        request = self.compose_request(action)
+    def execute_action(self, action, identifier):
+        request = self.compose_request(action, identifier)
         request_in_hex = [hex(c) for c in request]
         logger.debug(f"Request: {request_in_hex}")
         result = None

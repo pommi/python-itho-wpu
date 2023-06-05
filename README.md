@@ -99,6 +99,12 @@ See the [pislave](https://github.com/ootjersb/pislave#wiring) project
   ...
   ```
 
+* Retrieve a single setting from the WPU
+  ```
+  # ./itho-wpu.py --action getsetting --settingid 1
+  1. Hardware Configuratie: 70 (min: 0, max: 65535, step: 1)
+  ```
+
 # Exporting measurements
 
 ## InfluxDB
