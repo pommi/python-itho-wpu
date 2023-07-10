@@ -259,33 +259,53 @@ def process_datalog(response, wpu):
     measurements = {}
     for d in datalog:
         if d.type == 0x0 or d.type == 0xC:
-            m = message[d.index : d.index + 1]  # noqa: E203
-            num = int(m[0], 0)
-        elif d.type == 0x10:
-            m = message[d.index : d.index + 2]  # noqa: E203
-            num = (int(m[0], 0) << 8) + int(m[1], 0)
-        elif d.type == 0x12:
-            m = message[d.index : d.index + 2]  # noqa: E203
-            num = round((int(m[0], 0) << 8) + int(m[1], 0) / 100, 2)
-        elif d.type == 0x90:
-            m = message[d.index : d.index + 2]  # noqa: E203
-            num = (int(m[0], 0) << 8) + int(m[1], 0)
-            if num >= 32768:
-                num -= 65536
-        elif d.type == 0x92:
-            m = message[d.index : d.index + 2]  # noqa: E203
-            num = (int(m[0], 0) << 8) + int(m[1], 0)
-            if num >= 32768:
-                num -= 65536
-            num = round(num / 100, 2)
+            length = 1
+        elif d.type == 0x10 or d.type == 0x12 or d.type == 0x90 or d.type == 0x92:
+            length = 2
         elif d.type == 0x20:
-            m = message[d.index : d.index + 4]  # noqa: E203
-            num = (int(m[0], 0) << 24) + (int(m[1], 0) << 16) + (int(m[2], 0) << 8) + int(m[3], 0)
+            length = 4
         else:
-            logger.error(f"Unknown message type for datalog {d.name}: {d.type}")
+            logger.error(f"Unknown message type for datalog {d.label}: {d.type}")
+        num = format_datatype(d.label, message[d.index : d.index + length], d.type)  # noqa: E203
         logger.info(f"{d.description}: {num}")
         measurements[d.label] = num
     return measurements
+
+
+def format_datatype(name, m, dt):
+    """
+    Transform a list of bytes to a readable number based on the datatype.
+
+    :param str name: Name/label of the data
+    :param list[str] m: List of bytes in hexadecimal string format
+    :param dt: Datatype
+    :type dt: str or int
+    """
+
+    num = None
+    if type(dt) is str:
+        dt = int(dt, 0)
+
+    if dt == 0x0 or dt == 0xC:
+        num = int(m[-1], 0)
+    elif dt == 0x10:
+        num = (int(m[-2], 0) << 8) + int(m[-1], 0)
+    elif dt == 0x12:
+        num = round((int(m[-2], 0) << 8) + int(m[-1], 0) / 100, 2)
+    elif dt == 0x90:
+        num = (int(m[-2], 0) << 8) + int(m[-1], 0)
+        if num >= 32768:
+            num -= 65536
+    elif dt == 0x92:
+        num = (int(m[-2], 0) << 8) + int(m[-1], 0)
+        if num >= 32768:
+            num -= 65536
+        num = round(num / 100, 2)
+    elif dt == 0x20:
+        num = (int(m[-4], 0) << 24) + (int(m[-3], 0) << 16) + (int(m[-2], 0) << 8) + int(m[-1], 0)
+    else:
+        logger.error(f"Unknown datatype for '{name}': 0x{dt:X}")
+    return num
 
 
 if __name__ == "__main__":
