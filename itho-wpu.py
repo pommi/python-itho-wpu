@@ -34,7 +34,7 @@ def parse_args():
         "--action",
         nargs="?",
         required=True,
-        choices=actions.keys(),
+        choices=list(actions.keys()) + ["getsettings"],
         help="Execute an action",
     )
     parser.add_argument(
@@ -156,6 +156,20 @@ class IthoWPU:
                 logger.error(f"Unknown data type for label {dl['name']}: {dt}")
                 return datalog
         return datalog
+
+    def get_settings(self):
+        listversion = self.get_listversion_from_nodeid()
+        parameterlist_version = self.heatpump_db.execute(
+            f"SELECT parameterlist FROM versiebeheer WHERE version = {listversion}"
+        )[0]["parameterlist"]
+        if parameterlist_version is None or not type(parameterlist_version) == int:
+            logger.error(f"Parameterlist not found in database for version {listversion}")
+            return None
+        settings = self.heatpump_db.execute(
+            "SELECT id, name, min, max, def, title, description, unit "
+            + f"FROM parameterlijst_v{parameterlist_version}"
+        )
+        return settings
 
     def get_setting_by_id(self, settingid):
         listversion = self.get_listversion_from_nodeid()
@@ -339,6 +353,14 @@ def process_setting(response, wpu):
     )
 
 
+def process_settings(wpu, args):
+    settings = wpu.get_settings()
+    for setting in settings:
+        response = wpu.get("getsetting", int(setting["id"]))
+        if response is not None:
+            process_response("getsetting", response, args, wpu)
+
+
 def format_datatype(name, m, dt):
     """
     Transform a list of bytes to a readable number based on the datatype.
@@ -423,6 +445,11 @@ def main():
         return
 
     wpu = IthoWPU(args.master_only, args.slave_only, args.slave_timeout, args.no_cache)
+
+    if args.action == "getsettings":
+        process_settings(wpu, args)
+        return
+
     response = wpu.get(args.action, args.settingid)
     if response is not None:
         process_response(args.action, response, args, wpu)

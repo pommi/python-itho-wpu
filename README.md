@@ -105,6 +105,22 @@ See the [pislave](https://github.com/ootjersb/pislave#wiring) project
   1. Hardware Configuratie: 70 (min: 0, max: 65535, step: 1)
   ```
 
+* Retrieve all settings from the WPU
+  ```
+  # ./itho-wpu.py --action getsettings
+  0. Niet Gebruikt: 0 (min: 0, max: 65535, step: 1)
+  1. Hardware Configuratie: 70 (min: 0, max: 65535, step: 1)
+  2. Jaar Inbedrijfstelling: 2010 (min: 2004, max: 2099, step: 1)
+  3. Datum Van Inbedrijfstelling: 101 (min: 0, max: 3112, step: 1)
+  4. Max Handbedieningstijd (min): 0 (min: 0, max: 600, step: 1)
+  5. Vorsttemp (°C): 2.0 (min: -10.0, max: 10.0, step: 0.1)
+  6. Offset Voor Vorst Temp (K): 2.0 (min: 0.0, max: 10.0, step: 0.1)
+  7. Differentie Van Vorst Om Elektrisch Element Te Starten (K): 1.5 (min: 0.0, max: 10.0, step: 0.1)
+  8. Fout Reset Tijd (min): 120 (min: 1, max: 1440, step: 1)
+  9. Loginterval Tijd (sec): 5 (min: 1, max: 300, step: 1)
+  ...
+  ```
+
 # Exporting measurements
 
 ## InfluxDB
