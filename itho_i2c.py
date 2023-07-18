@@ -18,6 +18,7 @@ actions = {
     "getdatatype": [0xA4, 0x00],
     "getdatalog": [0xA4, 0x01],
     "getsetting": [0xA4, 0x10],
+    "setsetting": [0xA4, 0x10],
 }
 
 
@@ -51,13 +52,25 @@ class I2CMaster:
         self.i = I2CRaw(address=address, bus=bus)
         self.queue = queue
 
-    def compose_request(self, action, identifier):
+    def compose_request(self, action, identifier, value):
         if action == "getsetting":
             request = (
                 [0x80]
                 + actions[action]
                 + [0x04, 0x13]  # read, length
                 + [0x00, 0x00, 0x00, 0x00]  # current
+                + [0x00, 0x00, 0x00, 0x00]  # min
+                + [0x00, 0x00, 0x00, 0x00]  # max
+                + [0x00, 0x00, 0x00, 0x00]  # step
+                + [0x00, identifier, 0x00]
+            )
+        elif action == "setsetting":
+            byte_list_value = list(value.to_bytes(4, byteorder="big"))
+            request = (
+                [0x80]
+                + actions[action]
+                + [0x06, 0x13]  # write, length
+                + byte_list_value  # new
                 + [0x00, 0x00, 0x00, 0x00]  # min
                 + [0x00, 0x00, 0x00, 0x00]  # max
                 + [0x00, 0x00, 0x00, 0x00]  # step
@@ -78,11 +91,16 @@ class I2CMaster:
             checksum = 0
         return checksum
 
-    def execute_action(self, action, identifier):
-        request = self.compose_request(action, identifier)
+    def execute_action(self, action, identifier, value):
+        request = self.compose_request(action, identifier, value)
         request_in_hex = [hex(c) for c in request]
         logger.debug(f"Request: {request_in_hex}")
         result = None
+        if action == "setsetting":
+            sure = input("Are you really sure? (Type uppercase yes): ")
+            if sure != "YES":
+                logger.error("Aborted")
+                return
         for i in range(0, 20):
             logger.debug(f"Executing action: {action}")
             self.i.write_i2c_block_data(request)

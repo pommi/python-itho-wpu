@@ -121,6 +121,17 @@ See the [pislave](https://github.com/ootjersb/pislave#wiring) project
   ...
   ```
 
+* Change a setting of the WPU
+  ```
+  # ./itho-wpu.py --action setsetting --settingid 139 --value 48
+  Current setting:
+  139. Blokkade Tijd Van Verwarmen Naar Koelen (uur): 24 (min: 0, max: 168, step: 1)
+  Setting `139` will be changed to `48`? [y/N] y
+  Updating setting 139 to `48`
+  Are you really sure? (Type uppercase yes): YES
+  139. Blokkade Tijd Van Verwarmen Naar Koelen (uur): 48 (min: 0, max: 168, step: 1)
+  ```
+
 # Exporting measurements
 
 ## InfluxDB

@@ -24,6 +24,7 @@ actions = {
     "getdatatype": [0xA4, 0x00],
     "getdatalog": [0xA4, 0x01],
     "getsetting": [0xA4, 0x10],
+    "setsetting": [0xA4, 0x10],
 }
 
 
@@ -42,6 +43,11 @@ def parse_args():
         nargs="?",
         type=int,
         help="Setting identifier",
+    )
+    parser.add_argument(
+        "--value",
+        nargs="?",
+        help="Setting value",
     )
     parser.add_argument(
         "--loglevel",
@@ -82,7 +88,7 @@ class IthoWPU:
         self.datatype = self.get("getdatatype")
         self.heatpump_db = db.sqlite("heatpump.sqlite")
 
-    def get(self, action, identifier=None):
+    def get(self, action, identifier=None, value=None):
         if not self.no_cache:
             response = self.cache.get(action.replace("get", ""))
             if response is not None:
@@ -100,7 +106,7 @@ class IthoWPU:
         if not self.slave_only:
             master = I2CMaster(address=0x41, bus=1, queue=self._q)
             if action:
-                response = master.execute_action(action, identifier)
+                response = master.execute_action(action, identifier, value)
                 logger.debug(f"Response: {response}")
             master.close()
 
@@ -361,6 +367,52 @@ def process_settings(wpu, args):
             process_response("getsetting", response, args, wpu)
 
 
+def process_setsetting(wpu, args):
+    logger.info("Current setting:")
+    response = wpu.get("getsetting", int(args.settingid))
+    if response is None:
+        return
+    process_response("getsetting", response, args, wpu)
+    message = response[5:]
+    datatype = message[16]
+
+    if args.value is None:
+        value = input("Provide a new value: ")
+    else:
+        value = args.value
+
+    # TODO: add support for negative values
+    if float(value) < 0:
+        logger.error("Negative values are not supported yet.")
+        return
+
+    logger.debug(f"New setting datatype: {datatype}")
+    logger.debug(f"New setting (input): {value}")
+    normalized_value = int(value.replace(".", ""))
+    logger.debug(f"New setting (normalized): {normalized_value}")
+    hex_list_value = [hex(v) for v in list(normalized_value.to_bytes(4, byteorder="big"))]
+    logger.debug(f"New setting (hex): {hex_list_value}")
+    parsed_value = format_datatype(args.settingid, hex_list_value, datatype)
+    logger.debug(f"New setting (parsed): {parsed_value}")
+
+    _, minimum, maximum, _ = parse_setting(response, wpu)
+    if parsed_value < minimum or parsed_value > maximum:
+        logger.error(f"New value `{parsed_value}` is not between `{minimum}` and `{maximum}`")
+        return
+
+    sure = input(f"Setting `{args.settingid}` will be changed to `{parsed_value}`? [y/N] ")
+    if sure in ["y", "Y"]:
+        logger.info(f"Updating setting {args.settingid} to `{parsed_value}`")
+    else:
+        logger.error("Aborted")
+        return
+
+    response = wpu.get("setsetting", args.settingid, normalized_value)
+    if response is None:
+        return
+    process_response("getsetting", response, args, wpu)
+
+
 def format_datatype(name, m, dt):
     """
     Transform a list of bytes to a readable number based on the datatype.
@@ -441,7 +493,7 @@ def main():
             logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
         )
 
-    if args.action == "getsetting" and args.settingid is None:
+    if args.action in ["getsetting", "setsetting"] and args.settingid is None:
         logger.error("`--settingid` is required with `--action getsetting`")
         return
 
@@ -449,6 +501,10 @@ def main():
 
     if args.action == "getsettings":
         process_settings(wpu, args)
+        return
+
+    if args.action == "setsetting":
+        process_setsetting(wpu, args)
         return
 
     response = wpu.get(args.action, args.settingid)
