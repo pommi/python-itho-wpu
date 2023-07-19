@@ -434,6 +434,7 @@ def main():
 
     if args.loglevel:
         logger.setLevel(args.loglevel.upper())
+        logging.getLogger("itho_i2c").setLevel(args.loglevel.upper())
 
     if args.timestamp:
         stdout_log_handler.setFormatter(

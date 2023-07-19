@@ -4,8 +4,13 @@ import logging
 import pigpio
 import struct
 import time
+import sys
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+stdout_log_handler = logging.StreamHandler(sys.stdout)
+stdout_log_handler.setFormatter(logging.Formatter("%(message)s"))
+logger.addHandler(stdout_log_handler)
 
 actions = {
     "getnodeid": [0x90, 0xE0],
