@@ -19,6 +19,7 @@ actions = {
     "getdatalog": [0xA4, 0x01],
     "getsetting": [0xA4, 0x10],
     "setsetting": [0xA4, 0x10],
+    "getmanual": [0x40, 0x30],
 }
 
 
@@ -75,6 +76,16 @@ class I2CMaster:
                 + [0x00, 0x00, 0x00, 0x00]  # max
                 + [0x00, 0x00, 0x00, 0x00]  # step
                 + [0x00, identifier, 0x00]
+            )
+        elif action == "getmanual":
+            byte_identifier = list(identifier.to_bytes(2, byteorder="big"))
+            request = (
+                [0x80]
+                + actions[action]
+                + [0x04, 0x04]  # read, length
+                + [0x01]  # bank
+                + byte_identifier
+                + [0x01]  # 1 = manual
             )
         else:
             # 0x80 = source, 0x04 = msg_type, 0x00 = length

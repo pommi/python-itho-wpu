@@ -25,6 +25,7 @@ actions = {
     "getdatalog": [0xA4, 0x01],
     "getsetting": [0xA4, 0x10],
     "setsetting": [0xA4, 0x10],
+    "getmanual": [0x40, 0x30],
 }
 
 
@@ -39,10 +40,10 @@ def parse_args():
         help="Execute an action",
     )
     parser.add_argument(
-        "--settingid",
+        "--id",
         nargs="?",
         type=int,
-        help="Setting identifier",
+        help="Setting or manual identifier",
     )
     parser.add_argument(
         "--value",
@@ -193,6 +194,22 @@ class IthoWPU:
             return None
         return setting_details[0]
 
+    def get_manual_by_id(self, manualid):
+        listversion = self.get_listversion_from_nodeid()
+        handbed_version = self.heatpump_db.execute(
+            f"SELECT handbed FROM versiebeheer WHERE version = {listversion}"
+        )[0]["handbed"]
+        if handbed_version is None or not type(handbed_version) == int:
+            logger.error(f"Handbed not found in database for version {listversion}")
+            return None
+        manual_details = self.heatpump_db.execute(
+            "SELECT name, min, max, def, title, tooltip, unit "
+            + f"FROM handbed_v{handbed_version} WHERE id = {manualid}"
+        )
+        if len(manual_details) != 1:
+            return None
+        return manual_details[0]
+
 
 class IthoWPUCache:
     def __init__(self):
@@ -264,6 +281,8 @@ def process_response(action, response, args, wpu):
             export_to_influxdb(action, measurements)
     elif action == "getsetting":
         process_setting(response, wpu)
+    elif action == "getmanual":
+        process_manual(response, wpu)
     elif action == "getnodeid":
         process_nodeid(response)
     elif action == "getserial":
@@ -369,7 +388,7 @@ def process_settings(wpu, args):
 
 def process_setsetting(wpu, args):
     logger.info("Current setting:")
-    response = wpu.get("getsetting", int(args.settingid))
+    response = wpu.get("getsetting", int(args.id))
     if response is None:
         return
     process_response("getsetting", response, args, wpu)
@@ -392,7 +411,7 @@ def process_setsetting(wpu, args):
     logger.debug(f"New setting (normalized): {normalized_value}")
     hex_list_value = [hex(v) for v in list(normalized_value.to_bytes(4, byteorder="big"))]
     logger.debug(f"New setting (hex): {hex_list_value}")
-    parsed_value = format_datatype(args.settingid, hex_list_value, datatype)
+    parsed_value = format_datatype(args.id, hex_list_value, datatype)
     logger.debug(f"New setting (parsed): {parsed_value}")
 
     _, minimum, maximum, _ = parse_setting(response, wpu)
@@ -400,17 +419,39 @@ def process_setsetting(wpu, args):
         logger.error(f"New value `{parsed_value}` is not between `{minimum}` and `{maximum}`")
         return
 
-    sure = input(f"Setting `{args.settingid}` will be changed to `{parsed_value}`? [y/N] ")
+    sure = input(f"Setting `{args.id}` will be changed to `{parsed_value}`? [y/N] ")
     if sure in ["y", "Y"]:
-        logger.info(f"Updating setting {args.settingid} to `{parsed_value}`")
+        logger.info(f"Updating setting {args.id} to `{parsed_value}`")
     else:
         logger.error("Aborted")
         return
 
-    response = wpu.get("setsetting", args.settingid, normalized_value)
+    response = wpu.get("setsetting", args.id, normalized_value)
     if response is None:
         return
     process_response("getsetting", response, args, wpu)
+
+
+def process_manual(response, wpu):
+    message = response[5:]
+
+    manualid = int(message[2], 0)
+    manual = wpu.get_manual_by_id(manualid)
+    if manual is None:
+        logger.error(f"Manual '{manualid}' is invalid")
+        return
+
+    datatype = message[3]
+    value = format_datatype(manual["name"], message[4:6], datatype)
+
+    logger.info(
+        "{}. {}{}: {}".format(
+            manualid,
+            manual["title"].title(),
+            f' ({manual["unit"]})' if manual["unit"] is not None else "",
+            value,
+        )
+    )
 
 
 def format_datatype(name, m, dt):
@@ -493,8 +534,8 @@ def main():
             logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
         )
 
-    if args.action in ["getsetting", "setsetting"] and args.settingid is None:
-        logger.error("`--settingid` is required with `--action getsetting`")
+    if args.action in ["getsetting", "setsetting", "getmanual"] and args.id is None:
+        logger.error(f"`--id` is required with `--action {args.action}`")
         return
 
     wpu = IthoWPU(args.master_only, args.slave_only, args.slave_timeout, args.no_cache)
@@ -507,7 +548,7 @@ def main():
         process_setsetting(wpu, args)
         return
 
-    response = wpu.get(args.action, args.settingid)
+    response = wpu.get(args.action, args.id)
     if response is not None:
         process_response(args.action, response, args, wpu)
 
