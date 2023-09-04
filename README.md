@@ -138,6 +138,46 @@ See the [pislave](https://github.com/ootjersb/pislave#wiring) project
   0. Buitentemp (°C): 10.0
   ```
 
+* Initiate a manual operation
+  ```
+  # ./itho-wpu.py --action setmanual --id 0 --value 29.00
+  Current manual operation:
+  0. Buitentemp (°C): 10.0
+  Manual `0` will be changed to `29.0`? [y/N] y
+  Updating manual operation 0 to `29.0`
+  Are you really sure? (Type uppercase yes): YES
+  ```
+
+* Finish a manual operation
+  ```
+  # ./itho-wpu.py --action setmanual --id 0 --value 29.00 --no-check
+  Current manual operation:
+  0. Buitentemp (°C): 29.0
+  Manual `0` will be changed to `29.0`? [y/N] y
+  Updating manual operation 0 to `29.0`
+  Are you really sure? (Type uppercase yes): YES
+  ```
+
+* Reset all errors:
+  ```
+  # ./itho-wpu.py --action setmanual --id 37 --value 1
+  Current manual operation:
+  37. Reset Alle Fouten: 0
+  Manual `37` will be changed to `1`? [y/N] y
+  Updating manual operation 37 to `1`
+  Are you really sure? (Type uppercase yes): YES
+  ```
+
+* Reset timer:
+  ```
+  # ./itho-wpu.py --action setmanual --id 38 --value 1
+  Current manual operation:
+  38. Reset Timer: 0
+  Manual `38` will be changed to `1`? [y/N] y
+  Updating manual operation 38 to `1`
+  Are you really sure? (Type uppercase yes): YES
+  ```
+
 # Exporting measurements
 
 ## InfluxDB

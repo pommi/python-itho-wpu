@@ -20,6 +20,7 @@ actions = {
     "getsetting": [0xA4, 0x10],
     "setsetting": [0xA4, 0x10],
     "getmanual": [0x40, 0x30],
+    "setmanual": [0x40, 0x30],
 }
 
 
@@ -53,7 +54,7 @@ class I2CMaster:
         self.i = I2CRaw(address=address, bus=bus)
         self.queue = queue
 
-    def compose_request(self, action, identifier, value):
+    def compose_request(self, action, identifier, datatype, value, check):
         if action == "getsetting":
             request = (
                 [0x80]
@@ -87,6 +88,20 @@ class I2CMaster:
                 + byte_identifier
                 + [0x01]  # 1 = manual
             )
+        elif action == "setmanual":
+            byte_identifier = list(identifier.to_bytes(2, byteorder="big"))
+            byte_list_value = list(value.to_bytes(2, byteorder="big"))
+            byte_check = [0x01] if check else [0x00]
+            request = (
+                [0x80]
+                + actions[action]
+                + [0x06, 0x07]  # write, length
+                + [0x01]  # bank
+                + byte_identifier
+                + [datatype]  # datatype
+                + byte_list_value  # new
+                + byte_check
+            )
         else:
             # 0x80 = source, 0x04 = msg_type, 0x00 = length
             request = [0x80] + actions[action] + [0x04, 0x00]
@@ -102,12 +117,12 @@ class I2CMaster:
             checksum = 0
         return checksum
 
-    def execute_action(self, action, identifier, value):
-        request = self.compose_request(action, identifier, value)
+    def execute_action(self, action, identifier, datatype, value, check):
+        request = self.compose_request(action, identifier, datatype, value, check)
         request_in_hex = [hex(c) for c in request]
         logger.debug(f"Request: {request_in_hex}")
         result = None
-        if action == "setsetting":
+        if action in ["setsetting", "setmanual"]:
             sure = input("Are you really sure? (Type uppercase yes): ")
             if sure != "YES":
                 logger.error("Aborted")
@@ -120,6 +135,8 @@ class I2CMaster:
             if self.queue.qsize() > 0:
                 result = self.queue.get()
                 break
+            elif action == "setmanual" and self.queue.qsize() == 0:
+                return None
 
         if result is None:
             logger.error("No valid result in 20 requests")

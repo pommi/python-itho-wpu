@@ -26,6 +26,7 @@ actions = {
     "getsetting": [0xA4, 0x10],
     "setsetting": [0xA4, 0x10],
     "getmanual": [0x40, 0x30],
+    "setmanual": [0x40, 0x30],
 }
 
 
@@ -49,6 +50,12 @@ def parse_args():
         "--value",
         nargs="?",
         help="Setting value",
+    )
+    parser.add_argument(
+        "--check",
+        default=True,
+        action=argparse.BooleanOptionalAction,
+        help="Enable/disable manual operation (used with --setmanual)",
     )
     parser.add_argument(
         "--loglevel",
@@ -89,7 +96,7 @@ class IthoWPU:
         self.datatype = self.get("getdatatype")
         self.heatpump_db = db.sqlite("heatpump.sqlite")
 
-    def get(self, action, identifier=None, value=None):
+    def get(self, action, identifier=None, datatype=None, value=None, check=True):
         if not self.no_cache:
             response = self.cache.get(action.replace("get", ""))
             if response is not None:
@@ -107,7 +114,7 @@ class IthoWPU:
         if not self.slave_only:
             master = I2CMaster(address=0x41, bus=1, queue=self._q)
             if action:
-                response = master.execute_action(action, identifier, value)
+                response = master.execute_action(action, identifier, datatype, value, check)
                 logger.debug(f"Response: {response}")
             master.close()
 
@@ -426,7 +433,7 @@ def process_setsetting(wpu, args):
         logger.error("Aborted")
         return
 
-    response = wpu.get("setsetting", args.id, normalized_value)
+    response = wpu.get("setsetting", args.id, None, normalized_value)
     if response is None:
         return
     process_response("getsetting", response, args, wpu)
@@ -452,6 +459,46 @@ def process_manual(response, wpu):
             value,
         )
     )
+
+
+def process_setmanual(wpu, args):
+    logger.info("Current manual operation:")
+    response = wpu.get("getmanual", int(args.id))
+    if response is None:
+        return
+    process_response("getmanual", response, args, wpu)
+    message = response[5:]
+    datatype = message[3]
+
+    # TODO: check if Max Handbedieningstijd > 0
+
+    if args.value is None:
+        value = input("Provide a new value: ")
+    else:
+        value = args.value
+
+    # TODO: add support for negative values
+    if float(value) < 0:
+        logger.error("Negative values are not supported yet.")
+        return
+
+    logger.debug(f"New manual operation datatype: {datatype}")
+    logger.debug(f"New manual operation (input): {value}")
+    normalized_value = int(value.replace(".", ""))
+    logger.debug(f"New manual operation (normalized): {normalized_value}")
+    hex_list_value = [hex(v) for v in list(normalized_value.to_bytes(2, byteorder="big"))]
+    logger.debug(f"New manual operation (hex): {hex_list_value}")
+    parsed_value = format_datatype(args.id, hex_list_value, datatype)
+    logger.debug(f"New manual operation (parsed): {parsed_value}")
+
+    sure = input(f"Manual `{args.id}` will be changed to `{parsed_value}`? [y/N] ")
+    if sure in ["y", "Y"]:
+        logger.info(f"Updating manual operation {args.id} to `{parsed_value}`")
+    else:
+        logger.error("Aborted")
+        return
+
+    response = wpu.get("setmanual", args.id, int(datatype, 0), normalized_value, args.check)
 
 
 def format_datatype(name, m, dt):
@@ -534,7 +581,7 @@ def main():
             logging.Formatter("%(asctime)-15s %(levelname)s: %(message)s")
         )
 
-    if args.action in ["getsetting", "setsetting", "getmanual"] and args.id is None:
+    if args.action in ["getsetting", "setsetting", "getmanual", "setmanual"] and args.id is None:
         logger.error(f"`--id` is required with `--action {args.action}`")
         return
 
@@ -546,6 +593,10 @@ def main():
 
     if args.action == "setsetting":
         process_setsetting(wpu, args)
+        return
+
+    if args.action == "setmanual":
+        process_setmanual(wpu, args)
         return
 
     response = wpu.get(args.action, args.id)
