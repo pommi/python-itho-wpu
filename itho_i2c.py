@@ -21,6 +21,7 @@ actions = {
     "setsetting": [0xA4, 0x10],
     "getmanual": [0x40, 0x30],
     "setmanual": [0x40, 0x30],
+    "getcounters": [0x42, 0x10],
 }
 
 

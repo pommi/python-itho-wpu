@@ -132,6 +132,31 @@ See the [pislave](https://github.com/ootjersb/pislave#wiring) project
   139. Blokkade Tijd Van Verwarmen Naar Koelen (uur): 48 (min: 0, max: 168, step: 1)
   ```
 
+* Retrieve counters of the WPU
+  ```
+  ./itho-wpu.py --action getcounters
+  0. Bedrijf Cv Pomp (cnt_chpump): 5295 uur
+  1. Bedrijf Bron Pomp (cnt_source): 873 uur
+  2. Bedrijf Boiler Pomp (cnt_dhw): 56085 uur
+  3. Bedrijf Compressor (cnt_comp): 53066 uur
+  4. Bedrijf Elektrisch Element (cnt_elek): 45568 uur
+  5. Cv Bedrijf (cnt_chmode): 2869 uur
+  6. Boiler Bedrijf (cnt_dhwmode): 42518 uur
+  7. Vrijkoel Bedrijf (cnt_fcmode): 64098 uur
+  8. Bedrijf (cnt_run): 34559 uur
+  9. Cv Pomp Starts (cnt_chpstart): 65317
+  10. Bron Pomp Starts (cnt_srcpstart): 40672
+  11. Boiler Pomp Starts (cnt_dhwpstart): 30485
+  12. Compressor Starts (cnt_compstart): 62495
+  13. Elektrisch Element Start (cnt_elekstart): 44800
+  14. Cv Starts (cnt_chmstart): 9229
+  15. Boiler Starts (cnt_dhwmstart): 2069
+  16. Vrijkoel Starts (cnt_fcmstart): 62218
+  17. Systeem Starts (cnt_system): 61952
+  18. Bedrijf Dhw Element (cnt_dhwelement): 15616 uur
+  19. Dhw E-Element Starts (cnt_dhwestart): 0
+  ```
+
 * Retrieve a manual operation setting from the WPU
   ```
   # ./itho-wpu.py --loglevel info --action getmanual --id 0

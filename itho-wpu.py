@@ -27,6 +27,7 @@ actions = {
     "setsetting": [0xA4, 0x10],
     "getmanual": [0x40, 0x30],
     "setmanual": [0x40, 0x30],
+    "getcounters": [0x42, 0x10],
 }
 
 
@@ -171,6 +172,19 @@ class IthoWPU:
                 return datalog
         return datalog
 
+    def get_counters(self):
+        listversion = self.get_listversion_from_nodeid()
+        counters_version = self.heatpump_db.execute(
+            f"SELECT counters FROM versiebeheer WHERE version = {listversion}"
+        )[0]["counters"]
+        if counters_version is None or not type(counters_version) == int:
+            logger.error(f"Counters not found in database for version {listversion}")
+            return None
+        settings = self.heatpump_db.execute(
+            "SELECT id, name, title, tooltip, unit " + f"FROM counters_v{counters_version}"
+        )
+        return settings
+
     def get_settings(self):
         listversion = self.get_listversion_from_nodeid()
         parameterlist_version = self.heatpump_db.execute(
@@ -294,6 +308,8 @@ def process_response(action, response, args, wpu):
         process_nodeid(response)
     elif action == "getserial":
         process_serial(response)
+    elif action == "getcounters":
+        process_counters(response, wpu)
 
 
 def process_nodeid(response):
@@ -322,6 +338,24 @@ def process_nodeid(response):
 def process_serial(response):
     serial = (int(response[5], 0) << 16) + (int(response[6], 0) << 8) + int(response[7], 0)
     logger.info(f"Serial: {serial}")
+
+
+def process_counters(response, wpu):
+    counters = wpu.get_counters()
+    message = response[5:]
+    for c in counters:
+        index = int(c["id"]) * 2
+        num = format_datatype(c["name"], message[index : index + 2], 0x10)  # noqa: E203
+
+        logger.info(
+            "{}. {} ({}): {}{}".format(
+                int(c["id"]),
+                c["title"].title(),
+                c["name"].lower(),
+                num,
+                " " + c["unit"] if c["unit"] is not None else "",
+            )
+        )
 
 
 def process_datalog(response, wpu):

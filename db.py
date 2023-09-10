@@ -44,6 +44,17 @@ class sqlite:
             );""".format(
                 t
             )
+        elif t.startswith("counters"):
+            query = """
+            CREATE TABLE {} (
+                id real,
+                name text,
+                title text,
+                tooltip text,
+                unit text
+            );""".format(
+                t
+            )
         elif t.startswith("handbed"):
             query = """
             CREATE TABLE {} (
@@ -80,7 +91,8 @@ class sqlite:
                 version integer primary key,
                 datalabel integer,
                 parameterlist integer,
-                handbed integer
+                handbed integer,
+                counters interger
             );""".format(
                 t
             )
@@ -102,6 +114,13 @@ class sqlite:
             """.format(
                 t
             )
+        elif t.startswith("counters"):
+            query = """
+            INSERT INTO {} (id, name, title, tooltip, unit)
+            VALUES (?, ?, ?, ?, ?);
+            """.format(
+                t
+            )
         elif t.startswith("handbed"):
             query = """
             INSERT INTO {} (id, name, name_factory, min, max, def, title, tooltip, unit)
@@ -111,8 +130,8 @@ class sqlite:
             )
         elif t.startswith("versiebeheer"):
             query = """
-            INSERT INTO {} (version, datalabel, parameterlist, handbed)
-            VALUES (?, ?, ?, ?);
+            INSERT INTO {} (version, datalabel, parameterlist, handbed, counters)
+            VALUES (?, ?, ?, ?, ?);
             """.format(
                 t
             )

@@ -38,7 +38,9 @@ def convert(par_file, sqlite_db):
 
     tables = []
     for table_info in par_cur.tables(tableType="TABLE"):
-        if re.match("^(VersieBeheer|Data[Ll]abel|Parameterlijst|Handbed)", table_info.table_name):
+        if re.match(
+            "^(VersieBeheer|Data[Ll]abel|Parameterlijst|Handbed|Counters)", table_info.table_name
+        ):
             tables.append(table_info.table_name)
 
     for t in sorted(tables):
@@ -69,6 +71,19 @@ def convert(par_file, sqlite_db):
                         r.Eenheid_NL,
                     )
                 )
+        if re.match("^Counters", t):
+            par_cur.execute(f"select Index, Naam, Tekst_NL, Tooltip_NL, Eenheid_NL from {t}")
+            rows = par_cur.fetchall()
+            for r in sorted(rows):
+                data.append(
+                    (
+                        r.Index,
+                        r.Naam,
+                        r.Tekst_NL,
+                        r.Tooltip_NL,
+                        r.Eenheid_NL,
+                    )
+                )
         if re.match("^Handbed", t):
             par_cur.execute(
                 "select Index, Naam, Naam_fabriek, Min, Max, Default, "
@@ -90,10 +105,12 @@ def convert(par_file, sqlite_db):
                     )
                 )
         if re.match("^VersieBeheer", t):
-            par_cur.execute(f"select VersieNummer, DataLabel, ParameterLijst, Handbed from {t}")
+            par_cur.execute(
+                f"select VersieNummer, DataLabel, ParameterLijst, Handbed, Counters from {t}"
+            )
             rows = par_cur.fetchall()
             for r in sorted(rows):
-                data.append((r.VersieNummer, r.DataLabel, r.ParameterLijst, r.Handbed))
+                data.append((r.VersieNummer, r.DataLabel, r.ParameterLijst, r.Handbed, r.Counters))
         sqlite_db.insert(t.lower(), data)
 
 
