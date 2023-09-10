@@ -92,13 +92,13 @@ class IthoWPU:
         self._q = queue.Queue()
         self.no_cache = no_cache
         self.cache = IthoWPUCache()
-        self.nodeid = self.get("getnodeid")
-        self.datatype = self.get("getdatatype")
+        self.nodeid = self.call("getnodeid")
+        self.datatype = self.call("getdatatype")
         self.heatpump_db = db.sqlite("heatpump.sqlite")
 
-    def get(self, action, identifier=None, datatype=None, value=None, check=True):
+    def call(self, action, identifier=None, datatype=None, value=None, check=True):
         if not self.no_cache:
-            response = self.cache.get(action.replace("get", ""))
+            response = self.cache.call(action.replace("get", ""))
             if response is not None:
                 logger.debug(f"Response (from cache): {response}")
                 return response
@@ -245,7 +245,7 @@ class IthoWPUCache:
             logger.debug(f"Writing to local cache: {json.dumps(self._cache_data)}")
             json.dump(self._cache_data, cache_file)
 
-    def get(self, action):
+    def call(self, action):
         if action not in ["nodeid", "serial", "datatype"]:
             logger.debug(f"Cache for '{action}' is not supported")
             return None
@@ -388,14 +388,14 @@ def process_setting(response, wpu):
 def process_settings(wpu, args):
     settings = wpu.get_settings()
     for setting in settings:
-        response = wpu.get("getsetting", int(setting["id"]))
+        response = wpu.call("getsetting", int(setting["id"]))
         if response is not None:
             process_response("getsetting", response, args, wpu)
 
 
 def process_setsetting(wpu, args):
     logger.info("Current setting:")
-    response = wpu.get("getsetting", int(args.id))
+    response = wpu.call("getsetting", int(args.id))
     if response is None:
         return
     process_response("getsetting", response, args, wpu)
@@ -433,7 +433,7 @@ def process_setsetting(wpu, args):
         logger.error("Aborted")
         return
 
-    response = wpu.get("setsetting", args.id, None, normalized_value)
+    response = wpu.call("setsetting", args.id, None, normalized_value)
     if response is None:
         return
     process_response("getsetting", response, args, wpu)
@@ -463,7 +463,7 @@ def process_manual(response, wpu):
 
 def process_setmanual(wpu, args):
     logger.info("Current manual operation:")
-    response = wpu.get("getmanual", int(args.id))
+    response = wpu.call("getmanual", int(args.id))
     if response is None:
         return
     process_response("getmanual", response, args, wpu)
@@ -498,7 +498,7 @@ def process_setmanual(wpu, args):
         logger.error("Aborted")
         return
 
-    response = wpu.get("setmanual", args.id, int(datatype, 0), normalized_value, args.check)
+    response = wpu.call("setmanual", args.id, int(datatype, 0), normalized_value, args.check)
 
 
 def format_datatype(name, m, dt):
@@ -599,7 +599,7 @@ def main():
         process_setmanual(wpu, args)
         return
 
-    response = wpu.get(args.action, args.id)
+    response = wpu.call(args.action, args.id)
     if response is not None:
         process_response(args.action, response, args, wpu)
 
